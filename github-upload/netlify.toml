@@ -1,0 +1,8 @@
+[build]
+  publish = "site"
+
+# keep the works list fresh so new works show up right after an edit
+[[headers]]
+  for = "/content/*"
+  [headers.values]
+    Cache-Control = "no-cache"

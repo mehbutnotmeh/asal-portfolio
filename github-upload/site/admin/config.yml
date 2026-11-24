@@ -1,0 +1,50 @@
+# Admin panel for the portfolio (Decap CMS).
+# Online it signs in with GitHub and commits every change to the repository below;
+# Netlify then rebuilds the site. Locally, `npx decap-server` lets it edit the files directly.
+backend:
+  name: github
+  repo: mehbutnotmeh/asal-portfolio
+  branch: main
+  commit_messages:
+    update: "آثار به‌روز شد"
+    uploadMedia: "تصویر تازه: {{path}}"
+    deleteMedia: "حذف تصویر: {{path}}"
+
+local_backend: true
+locale: fa
+
+# new images go here, and are published at /uploads/...
+media_folder: site/uploads
+public_folder: /uploads
+
+collections:
+  - name: portfolio
+    label: پورتفولیو
+    editor:
+      preview: false
+    files:
+      - name: works
+        label: آثار
+        file: site/content/works.json
+        format: json
+        fields:
+          - name: works
+            label: فهرست آثار
+            label_singular: اثر
+            widget: list
+            add_to_top: true
+            summary: "{{fields.title_fa}} {{fields.kind}} · {{fields.image}}"
+            fields:
+              - { name: image, label: تصویر اثر, widget: image, choose_url: false }
+              - name: kind
+                label: دسته
+                widget: select
+                default: oil
+                options:
+                  - { label: رنگ روغن, value: oil }
+                  - { label: طراحی, value: draw }
+                  - { label: دیجیتال آرت, value: digital }
+              - { name: title_fa, label: عنوان فارسی (اختیاری), widget: string, required: false }
+              - { name: title_en, label: عنوان انگلیسی (اختیاری), widget: string, required: false }
+              - { name: width, label: عرض به سانتی‌متر (اختیاری), widget: number, value_type: float, required: false }
+              - { name: height, label: ارتفاع به سانتی‌متر (اختیاری), widget: number, value_type: float, required: false }

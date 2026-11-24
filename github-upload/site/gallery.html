@@ -1,0 +1,1284 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colour &amp; Line</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;600;700&family=Vazirmatn:wght@300;400;500;700&display=swap">
+<style>
+/* Layout: full-bleed WebGL gallery; HUD floats over it in quiet dark glass. Single dark look by design. */
+:root{
+  --ink:#08070a;          /* the dark of the rooms */
+  --glass:rgba(14,12,16,.72);
+  --fg:#efe8dc;           /* warm gallery-light white */
+  --muted:#9c9384;
+  --gilt:#c9a868;         /* frame gold, used sparingly */
+  --line:rgba(239,232,220,.14);
+  --font-display:"Markazi Text","Noto Naskh Arabic",Georgia,serif;
+  --font-body:Vazirmatn,Tahoma,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--fg);overflow:hidden;font-family:var(--font-body);-webkit-tap-highlight-color:transparent}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+
+/* intro / pause */
+#intro{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:flex-start;
+  padding:calc(68px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(270deg,rgba(8,7,10,.94) 0%,rgba(8,7,10,.78) 38%,rgba(8,7,10,.15) 75%,rgba(8,7,10,0) 100%);
+  transition:opacity .5s ease}
+html[dir="ltr"] #intro{background:linear-gradient(90deg,rgba(8,7,10,.94) 0%,rgba(8,7,10,.78) 38%,rgba(8,7,10,.15) 75%,rgba(8,7,10,0) 100%)}
+#intro.gone{opacity:0;pointer-events:none}
+.intro-inner{max-width:30rem;display:flex;flex-direction:column;gap:1.1rem;margin-inline-start:clamp(0px,6vw,90px)}
+.eyebrow{font-size:.8rem;letter-spacing:.08em;color:var(--gilt)}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(3rem,9vw,5.6rem);line-height:.95;margin:0;text-wrap:balance}
+.name{margin:-.2rem 0 0;font-family:var(--font-display);font-size:1.9rem;font-weight:600;color:var(--gilt);line-height:1.1}
+.bio{margin:-.6rem 0 0;font-size:.95rem;color:var(--fg);opacity:.85}
+.lede{color:var(--muted);line-height:1.9;margin:0;font-size:.98rem}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:.55rem 1rem;align-items:center;font-size:.88rem;color:var(--fg);margin:.2rem 0}
+.keys dt{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end;direction:ltr}
+html[dir="ltr"] .keys dt{justify-content:flex-start}
+html[dir="ltr"] .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:.72rem}
+.keys dd{margin:0;color:var(--muted)}
+kbd{font-family:var(--font-body);font-size:.75rem;min-width:1.7rem;text-align:center;padding:.2rem .45rem;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:rgba(255,255,255,.04);direction:ltr}
+#enter{align-self:flex-start;font-family:var(--font-body);font-size:1rem;font-weight:500;color:#140f08;background:var(--gilt);border:0;border-radius:999px;padding:.85rem 1.8rem;cursor:pointer;transition:transform .15s ease,background .2s}
+#enter:hover{background:#dbbc7e}
+#enter:active{transform:scale(.97)}
+#enter:focus-visible,.hud-btn:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+#enter[disabled]{opacity:.55;cursor:progress}
+.quality{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem .8rem;font-size:.85rem;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:rgba(255,255,255,.04)}
+.seg button{font-family:var(--font-body);font-size:.8rem;color:var(--fg);background:transparent;border:0;border-radius:999px;padding:.4rem .95rem;cursor:pointer;transition:background .2s,color .2s}
+.seg button[aria-pressed="true"]{background:var(--fg);color:#140f08}
+.seg button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+[hidden]{display:none!important}
+#backBtn{align-self:flex-start;font-family:var(--font-body);font-size:.95rem;font-weight:600;color:var(--gilt);background:rgba(201,168,104,.12);
+  border:1.5px solid var(--gilt);border-radius:999px;padding:.45rem 1.15rem;cursor:pointer;transition:background .2s,color .2s}
+#backBtn:hover{background:var(--gilt);color:#16110a}
+.touch-only{display:none}
+.desk-only{display:contents}
+body.touch .touch-only{display:contents}
+/* phone: keep the intro clear of the top buttons and let it scroll on short screens */
+body.touch #intro{align-items:flex-start;overflow-y:auto;padding-top:calc(68px + env(safe-area-inset-top,0px))}
+body.touch .intro-inner{margin-inline-start:0}
+@media (max-width:600px){
+  body #room{top:calc(62px + env(safe-area-inset-top,0px));padding:.35rem .7rem;border-radius:10px}
+  body #room .r-name{font-size:1.15rem}
+  body #room .r-count{font-size:.68rem}
+}
+body.touch .desk-only{display:none}
+
+/* HUD */
+.hud{position:fixed;z-index:10;pointer-events:none;transition:opacity .4s ease}
+body:not(.playing) .hud{opacity:0}
+#room{top:calc(14px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:2px}
+#room{text-shadow:0 1px 2px rgba(0,0,0,.7);background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:.5rem .85rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#room .r-count{color:var(--fg)!important;opacity:.8}
+#room .r-name{font-family:var(--font-display);font-size:1.6rem;font-weight:600;line-height:1}
+#room .r-count{font-size:.75rem;color:var(--muted);letter-spacing:.04em}
+body:not(.playing) #topbar{opacity:1}
+body:not(.playing) #pauseBtn{display:none}
+body.playing:not(.touch), body.playing:not(.touch) canvas{cursor:none}
+#topbar{z-index:25;top:calc(14px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));display:flex;gap:8px;pointer-events:auto}
+.hud-btn{font-family:var(--font-body);font-size:.8rem;color:var(--fg);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:.45rem .9rem;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.hud-btn[aria-pressed="false"]{color:var(--muted)}
+#cross{top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--fg);opacity:.55;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+body.touch #cross{display:none}
+#info{bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;transform:translate(-50%,12px);width:min(36rem,calc(100% - 32px));box-sizing:border-box;
+  background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:1rem 1.25rem;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:0;transition:opacity .35s ease,transform .35s ease}
+#info.show{opacity:1;transform:translate(-50%,0)}
+body:not(.playing) #info{opacity:0}
+#info .i-title{font-family:var(--font-display);font-size:1.75rem;font-weight:700;line-height:1.1;margin:0}
+#info .i-meta{font-size:.78rem;color:var(--gilt);margin:.35rem 0 .5rem;font-variant-numeric:tabular-nums}
+#info .i-desc{font-size:.88rem;line-height:1.85;color:var(--muted);margin:0}
+#hint{bottom:calc(22px + env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));font-size:.72rem;color:var(--muted);display:flex;gap:.4rem;align-items:center}
+body.touch #hint{display:none}
+body.near #hint{opacity:0}
+
+/* touch controls */
+#joy,#runBtn{display:none}
+body.touch.playing #joy{display:block;position:fixed;z-index:11;left:max(28px,env(safe-area-inset-left,0px));bottom:calc(36px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid var(--line);background:rgba(14,12,16,.4);touch-action:none}
+#joy .knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;background:rgba(239,232,220,.22);border:1px solid rgba(239,232,220,.35)}
+body.touch.playing #runBtn{display:block;position:fixed;z-index:11;right:max(28px,env(safe-area-inset-right,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+body.touch #info{display:none}   /* on a phone the card covers the work; the label on the wall says the same */
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="stage"></div>
+
+<div id="intro">
+  <div class="intro-inner">
+    <div class="eyebrow" data-i18n="eyebrow">دو سالن و یک راهرو · سی‌وسه اثر</div>
+    <h1 data-i18n="portfolio">پورتفولیوی من</h1>
+    <p class="name" data-i18n="artist">عسل خدایی</p>
+    <p class="bio" data-i18n="bio">متولد ۱۳۸۲ · دانش‌آموخته‌ی نقاشی از دانشکده‌ی سوره</p>
+    <p class="lede" data-i18n="lede">شش تابلوی رنگ روغن در سالن اول، هفت طراحی در سالن دوم و بیست نقاشی دیجیتال در راهروی پشت آن. از درگاه‌ها رد شو و آزادانه به هر اثری که خواستی نزدیک شو.</p>
+    <dl class="keys">
+      <span class="desk-only">
+        <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd data-i18n="k_move">حرکت (یا کلیدهای جهت‌نما)</dd>
+        <dt><kbd data-i18n="k_mouse">موس</kbd></dt><dd data-i18n="k_look">نگاه به اطراف</dd>
+        <dt><kbd>Shift</kbd></dt><dd data-i18n="k_run">دویدن</dd>
+        <dt><kbd>M</kbd></dt><dd data-i18n="k_music">روشن و خاموش کردن موسیقی</dd>
+        <dt><kbd>L</kbd></dt><dd data-i18n="k_lang">English / فارسی</dd>
+        <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd data-i18n="k_turn">چرخیدن به چپ و راست</dd>
+        <dt><kbd>P</kbd><kbd>Esc</kbd></dt><dd data-i18n="k_esc">توقف و آزاد کردن موس</dd>
+      </span>
+      <span class="touch-only">
+        <dt><kbd data-i18n="t_joy">دایره‌ی پایین</kbd></dt><dd data-i18n="t_move">حرکت</dd>
+        <dt><kbd data-i18n="t_drag">کشیدن انگشت</kbd></dt><dd data-i18n="k_look">نگاه به اطراف</dd>
+        <dt><kbd data-i18n="run">دویدن</kbd></dt><dd data-i18n="t_run">دکمه‌ی پایین سمت راست</dd>
+      </span>
+    </dl>
+    <div class="quality" role="group" aria-labelledby="qLabel">
+      <span id="qLabel" data-i18n="quality">کیفیت تصویر</span>
+      <div class="seg"><button data-q="low" data-i18n="q_low">پایین</button><button data-q="medium" data-i18n="q_medium">متوسط</button><button data-q="high" data-i18n="q_high">بالا</button></div>
+    </div>
+    <button id="backBtn" type="button" hidden data-i18n="back">→ بازگشت</button>
+    <button id="enter" disabled>در حال آماده‌سازی سالن‌ها…</button>
+  </div>
+</div>
+
+<div id="room" class="hud"><span class="r-name">سالن رنگ روغن</span><span class="r-count">۶ اثر</span></div>
+<div id="topbar" class="hud"><button id="pauseBtn" class="hud-btn" data-i18n="pause">توقف</button><button id="langBtn" class="hud-btn" lang="en">English</button><button id="musicBtn" class="hud-btn" aria-pressed="true">موسیقی: روشن</button></div>
+<div id="cross" class="hud"></div>
+<div id="info" class="hud" aria-live="polite"><p class="i-title"></p><div class="i-meta"></div><p class="i-desc"></p></div>
+<div id="hint" class="hud"><kbd>M</kbd> <span data-i18n="music">موسیقی</span> &nbsp; <kbd>P</kbd> <kbd>Esc</kbd> <span data-i18n="pause">توقف</span></div>
+<div id="joy"><div class="knob"></div></div>
+<button id="runBtn" class="hud-btn" aria-pressed="false">دویدن</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(async () => {
+// the works list the admin panel edits; without it the gallery shows its original hang
+const LIST = await fetch('content/works.json', { cache:'no-cache' }).then(r => r.ok ? r.json() : null).then(d => d && Array.isArray(d.works) ? d.works : null).catch(() => null);
+/* =====================================================================
+   آثار گالری
+   src = فایل تصویر، size = اندازه‌ی واقعی به سانتی‌متر (همان‌طور که روی برچسب نوشته می‌شود)
+   title = فقط برای آثاری که اسم دارند
+   wall = دیوار (N/S/E/W)، at = موقعیت روی دیوار به متر
+   ضلع بلندِ اثر به اندازه‌ی بزرگ‌ترین عدد size است و ضلع دیگر از نسبت عکس حساب می‌شود.
+   ===================================================================== */
+const EDGE = { fa:'مرز دیدن', en:'The Edge of Perception' };
+const HUNG = [
+  // ---- سالن رنگ روغن ----
+  { room:'oil',  wall:'N', at:-12.5, src:'images/oil-edge-1.jpg', size:[80, 80], title:EDGE },
+  { room:'oil',  wall:'N', at:-7.5,  src:'images/oil-edge-2.jpg', size:[50, 80], title:EDGE },
+  { room:'oil',  wall:'N', at:-2.6,  src:'images/oil-edge-3.jpg', size:[60, 80], title:EDGE },
+  { room:'oil',  wall:'S', at:-12.5, src:'images/oil-edge-4.jpg', size:[80, 80], title:EDGE },
+  { room:'oil',  wall:'S', at:-7.5,  src:'images/oil-a3-1.jpg',   size:[29.7, 42] },
+  { room:'oil',  wall:'S', at:-2.6,  src:'images/oil-a3-2.jpg',   size:[20, 20] },
+  // ---- سالن طراحی ----
+  // first on the left through the doorway: a pair, a little smaller (long = 1.5 m) so both fit evenly between the corner and the pilaster
+  { room:'draw', wall:'N', at:1.45, src:'images/drawing-2.jpg', size:[42, 59], long:1.5 },
+  { room:'draw', wall:'N', at:3.72, src:'images/drawing-1.jpg', size:[42, 59], long:1.5 },
+  { room:'draw', wall:'N', at:8,  src:'images/drawing-3.jpg', size:[42, 59] },
+  { room:'draw', wall:'N', at:13, src:'images/drawing-5.jpg', size:[42, 59] },
+  { room:'draw', wall:'S', at:3,  src:'images/drawing-4.jpg', size:[42, 59] },
+  { room:'draw', wall:'S', at:8,  src:'images/drawing-6.jpg', size:[42, 59] },
+  { room:'draw', wall:'S', at:13, src:'images/drawing-7.jpg', size:[42, 59] },
+  // ---- راهروی دیجیتال (long = ضلع بلند به متر، چون این آثار اندازه‌ی سانتی‌متری ندارند) ----
+  { room:'digital', wall:'E', at:0, src:'digital/digital-01.jpg', long:2.3 },   // alone on the far end wall, seen down the whole corridor
+  // north wall; 2, 3 and 4 hang last, nearest the end wall
+  ...[5, 6, 7, 8, 9, 10, 11, 2, 3, 4].map((n, i) => ({ room:'digital', wall:'N', at:18.2 + i*2.6, src:`digital/digital-${String(n).padStart(2, '0')}.jpg` })),
+  ...[12, 13, 14, 15, 16, 17, 18, 19, 20].map((n, i) => ({ room:'digital', wall:'S', at:19.5 + i*2.6, src:`digital/digital-${String(n).padStart(2, '0')}.jpg` })),
+];
+
+/* works from the admin panel: the original works keep their hand-placed spots (with any edited
+   title or size); a removed work leaves the wall; works added later hang further down the
+   digital corridor, which grows to fit them, alternating north and south walls */
+const ROOMS = ['oil', 'draw', 'digital'];
+const workPath = s => String(s || '').replace(/^\//, '');
+let ARTWORKS = HUNG, DIG_EXTRA = 0;
+if (LIST){
+  const byPath = new Map(LIST.filter(w => w && w.image && ROOMS.includes(w.kind)).map(w => [workPath(w.image), w]));
+  const fromList = w => ({
+    title: (w.title_fa || w.title_en) ? { fa:w.title_fa || w.title_en, en:w.title_en || w.title_fa } : undefined,
+    size: w.width && w.height ? [w.width, w.height] : undefined,
+  });
+  const kept = HUNG.filter(a => byPath.has(a.src)).map(a => {
+    const w = byPath.get(a.src), f = fromList(w);
+    return { ...a, title:f.title, size:a.room === 'digital' ? a.size : (f.size || a.size) };
+  });
+  const hungPaths = new Set(HUNG.map(a => a.src));
+  const added = [...byPath.entries()].filter(([p]) => !hungPaths.has(p)).reverse()   // the list puts the newest first; hang the oldest first
+    .map(([p, w], k) => ({ room:w.kind, hall:'digital', wall:k % 2 ? 'S' : 'N', at:44.2 + k*1.3, src:p, ...fromList(w),
+      long:w.kind === 'digital' || !(w.width && w.height) ? 1.75 : undefined }));
+  ARTWORKS = [...kept, ...added];
+  if (added.length) DIG_EXTRA = Math.max(0, added[added.length - 1].at + 1.9 - 43.5);
+}
+// room counts for the signs and the welcome text, written out only when the hang has changed
+// counted by where each work hangs, so a new oil painting in the corridor counts towards the corridor
+const COUNT = Object.fromEntries(ROOMS.map(r => [r, ARTWORKS.filter(a => (a.hall || a.room) === r).length]));
+const CHANGED = COUNT.oil !== 6 || COUNT.draw !== 7 || COUNT.digital !== 20;
+
+const I18N = {
+  fa: {
+    eyebrow:'دو سالن و یک راهرو · سی‌وسه اثر', title:'رنگ و خط',
+    portfolio:'پورتفولیوی من', artist:'عسل خدایی', bio:'متولد ۱۳۸۲ · دانش‌آموخته‌ی نقاشی از دانشکده‌ی سوره',
+    wall_eyebrow:'نمایشگاه آثار', wall_works:'دو سالن و یک راهرو · سی‌وسه اثر · رنگ روغن، طراحی و نقاشی دیجیتال',
+    lede:'شش تابلوی رنگ روغن در سالن اول، هفت طراحی در سالن دوم و بیست نقاشی دیجیتال در راهروی پشت آن. از درگاه‌ها رد شو و آزادانه به هر اثری که خواستی نزدیک شو.',
+    k_move:'حرکت (یا کلیدهای جهت‌نما)', k_mouse:'موس', k_look:'نگاه به اطراف', k_run:'دویدن', k_music:'روشن و خاموش کردن موسیقی', k_lang:'تغییر زبان', k_turn:'چرخیدن به چپ و راست', k_esc:'توقف و آزاد کردن موس',
+    t_joy:'دایره‌ی پایین', t_move:'حرکت', t_drag:'کشیدن انگشت', t_run:'دکمه‌ی پایین سمت راست',
+    loading:'در حال آماده‌سازی سالن‌ها…', enter:'ورود به گالری', resume:'ادامه‌ی بازدید', pause:'توقف', music:'موسیقی',
+    music_on:'موسیقی: روشن', music_off:'موسیقی: خاموش', run:'دویدن', run_on:'دویدن: روشن',
+    oil:'سالن رنگ روغن', draw:'سالن طراحی', oil_count:'۶ اثر', draw_count:'۷ اثر',
+    digital:'راهروی دیجیتال آرت', digital_count:'۲۰ اثر', digital_medium:'نقاشی دیجیتال',
+    sign_oil:'شش اثر · رنگ روغن روی بوم', sign_draw:'هفت اثر طراحی', sign_digital:'بیست نقاشی دیجیتال', langBtn:'English',
+    quality:'کیفیت تصویر', q_low:'پایین', q_medium:'متوسط', q_high:'بالا', back:'→ بازگشت',
+  },
+  en: {
+    eyebrow:'Two rooms and a corridor · Thirty-three works', title:'Colour & Line',
+    portfolio:'My Portfolio', artist:'Asal Khodaei', bio:'Born 2004 · Painting graduate, Soore University',
+    wall_eyebrow:'An exhibition of works by', wall_works:'Two rooms and a corridor · Thirty-three works · Oil, drawing and digital painting',
+    lede:'Six oil paintings in the first room, seven drawings in the second, and twenty digital paintings in the corridor beyond. Walk through the doorways and get as close as you like to any work.',
+    k_move:'Move (or arrow keys)', k_mouse:'Mouse', k_look:'Look around', k_run:'Run', k_music:'Music on / off', k_lang:'Switch language', k_turn:'Turn left / right', k_esc:'Pause and release the mouse',
+    t_joy:'Joystick', t_move:'Move', t_drag:'Drag', t_run:'Bottom-right button',
+    loading:'Preparing the rooms…', enter:'Enter the gallery', resume:'Continue the visit', pause:'Pause', music:'Music',
+    music_on:'Music: on', music_off:'Music: off', run:'Run', run_on:'Run: on',
+    oil:'Oil Painting Room', draw:'Drawing Room', oil_count:'6 works', draw_count:'7 works',
+    digital:'Digital Art Corridor', digital_count:'20 works', digital_medium:'Digital painting',
+    sign_oil:'Six works · oil on canvas', sign_draw:'Seven drawings', sign_digital:'Twenty digital paintings', langBtn:'فارسی',
+    quality:'Picture quality', q_low:'Low', q_medium:'Medium', q_high:'High', back:'← Back',
+  },
+};
+if (CHANGED){
+  const fan = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]), total = COUNT.oil + COUNT.draw + COUNT.digital;
+  Object.assign(I18N.fa, {
+    eyebrow:`دو سالن و یک راهرو · ${fan(total)} اثر`, wall_works:`دو سالن و یک راهرو · ${fan(total)} اثر · رنگ روغن، طراحی و نقاشی دیجیتال`,
+    lede:`${fan(COUNT.oil)} تابلوی رنگ روغن در سالن اول، ${fan(COUNT.draw)} طراحی در سالن دوم و بقیه‌ی آثار در راهروی پشت آن. از درگاه‌ها رد شو و آزادانه به هر اثری که خواستی نزدیک شو.`,
+    oil_count:`${fan(COUNT.oil)} اثر`, draw_count:`${fan(COUNT.draw)} اثر`, digital_count:`${fan(COUNT.digital)} اثر`,
+    sign_oil:`${fan(COUNT.oil)} اثر · رنگ روغن روی بوم`, sign_draw:`${fan(COUNT.draw)} اثر طراحی`, sign_digital:`${fan(COUNT.digital)} اثر`,
+  });
+  Object.assign(I18N.en, {
+    eyebrow:`Two rooms and a corridor · ${total} works`, wall_works:`Two rooms and a corridor · ${total} works · Oil, drawing and digital painting`,
+    lede:`${COUNT.oil} oil paintings in the first room, ${COUNT.draw} drawings in the second, and the rest of the works in the corridor beyond. Walk through the doorways and get as close as you like to any work.`,
+    oil_count:`${COUNT.oil} works`, draw_count:`${COUNT.draw} works`, digital_count:`${COUNT.digital} works`,
+    sign_oil:`${COUNT.oil} works · oil on canvas`, sign_draw:`${COUNT.draw} drawings`, sign_digital:`${COUNT.digital} works`,
+  });
+}
+let lang = 'en';   // every visit opens in English; a switch to Persian holds for this visit only, shared with the portfolio
+try { if (sessionStorage.getItem('gallery-lang') === 'fa') lang = 'fa'; } catch (e) {}
+const D = k => I18N[lang][k];
+
+const FA = s => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const isTouch = matchMedia('(pointer: coarse)').matches;
+if (isTouch) document.body.classList.add('touch');
+
+/* ---------------- world dimensions ---------------- */
+const H = 4.6, WT = 0.3, ZH = 4.5;           // ceiling height, wall thickness, half corridor width
+const OIL_X = [-16, 0], DRAW_X = [0, 16];
+const DIG_X = [DRAW_X[1] + WT, DRAW_X[1] + WT + 27.2 + DIG_EXTRA], CZ = 3;   // the digital corridor, off the drawing room's east wall (longer when works are added); half width
+const DOOR_HALF = 1.3, DOOR_H = 3.2;
+const EYE = 1.78, RADIUS = 0.35;
+
+/* ---------------- renderer / scene ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.getElementById('stage').appendChild(renderer.domElement);
+const MAXANI = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b2129);
+scene.fog = new THREE.FogExp2(0x1b2129, 0.02);
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 80);
+camera.rotation.order = 'YXZ';
+const player = { x:-14.2, z:2.6, yaw:-Math.PI/2 + 0.32, pitch:-0.02, vx:0, vz:0, step:0 };
+window.galleryPlayer = player;
+
+scene.add(new THREE.HemisphereLight(0xc4d2e4, 0x2d2a26, 0.36));
+scene.add(new THREE.AmbientLight(0x8fa3bd, 0.08));
+for (const fx of [4, 12]){                                          // soft fill keeps the drawing room airy
+  const fill = new THREE.PointLight(0xe4ecf4, 0.4, 8.5, 1.2);
+  fill.position.set(fx, 3.9, 0); scene.add(fill);
+}
+
+/* ---------------- helpers ---------------- */
+function rng(seed){ let s = seed >>> 0; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeCanvas(aspect, long = 1024){ const c = document.createElement('canvas'); if (aspect >= 1){ c.width = long; c.height = Math.round(long / aspect); } else { c.height = long; c.width = Math.round(long * aspect); } return c; }
+function tex(c, repeat){ const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = MAXANI; if (repeat){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); } return t; }
+const colliders = [];
+// box with UVs in metres (one texture tile = 2 m), so surface textures keep their scale on any size of box
+function worldBox(w, h, d){
+  const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv, T = 2;
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];   // +x −x +y −y +z −z
+  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++){ const i = f*4 + k; uv.setXY(i, uv.getX(i)*dims[f][0]/T, uv.getY(i)*dims[f][1]/T); }
+  return geo;
+}
+function box(w, h, d, x, y, z, mat, collide = true){
+  const m = new THREE.Mesh(worldBox(w, h, d), mat);
+  m.position.set(x, y, z); scene.add(m);
+  if (collide) colliders.push({ minX:x - w/2, maxX:x + w/2, minZ:z - d/2, maxZ:z + d/2 });
+  return m;
+}
+function wrapText(g, text, maxW){
+  const words = text.split(' '), lines = []; let line = '';
+  for (const w of words){ const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line){ lines.push(line); line = w; } else line = t; }
+  if (line) lines.push(line); return lines;
+}
+
+/* ---------------- materials ---------------- */
+// tileable surface: soft mottling (blobs drawn with wrap-around) plus fine grain
+function surfaceCanvas(S, seed, base, blobs, mottle, grain){
+  const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), r = rng(seed);
+  g.fillStyle = base; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < blobs; i++){
+    const x = r()*S, y = r()*S, rad = S*(0.04 + r()*0.22), a = r()*mottle, col = r() < 0.5 ? '255,255,255' : '0,0,0';
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]){
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rad);
+      gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`);
+      g.fillStyle = gr; g.fillRect(x + ox - rad, y + oy - rad, rad*2, rad*2);
+    }
+  }
+  const img = g.getImageData(0, 0, S, S), d = img.data;
+  for (let i = 0; i < d.length; i += 4){ const n = (r() - 0.5)*grain; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+// painted plaster for walls, ceilings and mouldings (white, so each material's colour tints it)
+// no mottling on either: blotches read as dirt, so only an even fine grain
+const plasterTex = tex(surfaceCanvas(512, 5, '#f2f2f2', 0, 0, 7), [1, 1]);
+// dark red carpet: an even, fine pile, one tile = 2 m
+const carpetTex = tex(surfaceCanvas(1024, 31, '#5c1016', 0, 0, 22), [16.3/2, 9/2]);
+const floorMat = new THREE.MeshStandardMaterial({ map:carpetTex, bumpMap:carpetTex, bumpScale:0.015, roughness:1, metalness:0 });
+const floorOilMat = floorMat.clone(); floorOilMat.color.set(0xb8acac);   // a shade darker in the oil room
+const oilWallMat  = new THREE.MeshStandardMaterial({ color:0x353c47, roughness:0.93 });   // grey-blue
+const drawWallMat = new THREE.MeshStandardMaterial({ color:0xd4bb88, roughness:0.93 });   // cream
+const digWallMat  = new THREE.MeshStandardMaterial({ color:0x2e2f42, roughness:0.93 });   // deep indigo slate: a cousin of the oil room's grey-blue that suits the blues, violets and reds of the digital works
+const ceilMat  = new THREE.MeshStandardMaterial({ color:0x1e2b50, roughness:0.95 });   // navy
+const beamMat  = new THREE.MeshStandardMaterial({ color:0x26375f, roughness:0.85 });
+const plasterMat = new THREE.MeshStandardMaterial({ color:0xe8e3d8, roughness:0.82 });
+const plasterOil = new THREE.MeshStandardMaterial({ color:0xa69e8e, roughness:0.82 });   // aged plaster for the oil room
+const ceilOilMat = new THREE.MeshStandardMaterial({ color:0x101830, roughness:0.95 });
+const beamOilMat = new THREE.MeshStandardMaterial({ color:0x17213b, roughness:0.85 });
+const fluteMat = new THREE.MeshStandardMaterial({ color:0xbcb5a7, roughness:0.9 });
+const trimMat  = new THREE.MeshStandardMaterial({ color:0x1d232b, roughness:0.6 });
+const casingMat= new THREE.MeshStandardMaterial({ color:0xe2dccf, roughness:0.8 });
+const metalMat = new THREE.MeshStandardMaterial({ color:0x18171a, roughness:0.35, metalness:0.8 });
+const giltMat  = new THREE.MeshStandardMaterial({ color:0x7a5a2c, roughness:0.32, metalness:0.75 });
+const giltInner= new THREE.MeshStandardMaterial({ color:0x3b2a16, roughness:0.5, metalness:0.5 });
+const blackFrame=new THREE.MeshStandardMaterial({ color:0x111012, roughness:0.4, metalness:0.2 });
+const matBoard = new THREE.MeshStandardMaterial({ color:0xefebe2, roughness:0.95 });
+const woodMat  = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.5 });
+for (const m of [oilWallMat, drawWallMat, digWallMat, ceilMat, ceilOilMat, beamMat, beamOilMat, plasterMat, plasterOil, fluteMat, casingMat]){
+  m.map = plasterTex; m.bumpMap = plasterTex; m.bumpScale = 0.008; m.needsUpdate = true;
+}
+// walnut grain along the bench seat
+woodMat.map = tex((() => {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'), r = rng(9);
+  g.fillStyle = '#6e4325'; g.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 90; i++){
+    const y = r()*256, a = 0.05 + r()*0.18, amp = 2 + r()*6, ph = r()*6;
+    g.strokeStyle = r() < 0.6 ? `rgba(30,15,8,${a})` : `rgba(150,95,60,${a*0.7})`; g.lineWidth = 0.6 + r()*2;
+    g.beginPath(); for (let x = 0; x <= 512; x += 8) g.lineTo(x, y + Math.sin(x/512*Math.PI*2*2 + ph)*amp); g.stroke();
+  }
+  return c;
+})(), [1, 1]);
+
+/* ---------------- architecture ---------------- */
+const totalW = (DRAW_X[1] - OIL_X[0]) + 2*WT;
+for (const [cx, fm, cm] of [[-8.15, floorOilMat, ceilOilMat], [8.15, floorMat, ceilMat]]){
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16.3, 9), fm);
+  floor.rotation.x = -Math.PI/2; floor.position.x = cx; scene.add(floor);
+  const ceilGeo = new THREE.PlaneGeometry(16.3, 9), cuv = ceilGeo.attributes.uv;   // plaster tile = 2 m
+  for (let i = 0; i < cuv.count; i++) cuv.setXY(i, cuv.getX(i)*16.3/2, cuv.getY(i)*9/2);
+  const ceil = new THREE.Mesh(ceilGeo, cm);
+  ceil.rotation.x = Math.PI/2; ceil.position.set(cx, H, 0); scene.add(ceil);
+}
+{ // the digital corridor's floor and ceiling: the same carpet, a little cooler and darker; the oil room's night-blue ceiling
+  const L = DIG_X[1] - DIG_X[0], cx = (DIG_X[0] + DIG_X[1])/2;
+  const ct = carpetTex.clone(); ct.repeat.set(L/2, CZ); ct.needsUpdate = true;
+  const fm = new THREE.MeshStandardMaterial({ map:ct, bumpMap:ct, bumpScale:0.015, roughness:1, metalness:0, color:0xa49aa6 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(L, CZ*2), fm);
+  floor.rotation.x = -Math.PI/2; floor.position.x = cx; scene.add(floor);
+  const ceilGeo = new THREE.PlaneGeometry(L, CZ*2), cuv = ceilGeo.attributes.uv;
+  for (let i = 0; i < cuv.count; i++) cuv.setXY(i, cuv.getX(i)*L/2, cuv.getY(i)*CZ);
+  const ceil = new THREE.Mesh(ceilGeo, ceilOilMat);
+  ceil.rotation.x = Math.PI/2; ceil.position.set(cx, H, 0); scene.add(ceil);
+}
+
+for (const [[x0, x1], m] of [[OIL_X, oilWallMat], [DRAW_X, drawWallMat]]){   // north + south, one colour per room
+  box(x1 - x0 + WT, H, WT, (x0 + x1)/2, H/2, -ZH - WT/2, m);
+  box(x1 - x0 + WT, H, WT, (x0 + x1)/2, H/2,  ZH + WT/2, m);
+}
+box(WT, H, ZH*2, OIL_X[0] - WT/2, H/2, 0, oilWallMat);      // west
+const seg = ZH - DOOR_HALF;
+function doorWall(x, faces){                                 // a cross wall with an open doorway in the middle
+  box(WT, H, seg, x, H/2, -(DOOR_HALF + seg/2), faces);
+  box(WT, H, seg, x, H/2,  (DOOR_HALF + seg/2), faces);
+  box(WT, H - DOOR_H, DOOR_HALF*2, x, DOOR_H + (H - DOOR_H)/2, 0, faces, false);
+}
+doorWall(0, [drawWallMat, oilWallMat, oilWallMat, oilWallMat, oilWallMat, oilWallMat]);               // +x face looks into the drawing room
+doorWall(DRAW_X[1] + WT/2, [digWallMat, drawWallMat, drawWallMat, drawWallMat, drawWallMat, drawWallMat]);   // east, out to the corridor
+// the corridor's own walls
+const DIG_L = DIG_X[1] - DIG_X[0];
+box(DIG_L + WT, H, WT, DIG_X[0] + (DIG_L + WT)/2, H/2, -CZ - WT/2, digWallMat);
+box(DIG_L + WT, H, WT, DIG_X[0] + (DIG_L + WT)/2, H/2,  CZ + WT/2, digWallMat);
+box(WT, H, CZ*2, DIG_X[1] + WT/2, H/2, 0, digWallMat);
+
+// plasterwork: cornice, picture rail, chair rail, skirting, raised panels, pilasters, ceiling beams
+const WALLS = [
+  { a:[-16, -ZH], b:[0, -ZH], n:[0, 1], pil:[-15.55, -10, -5.05] },
+  { a:[-16,  ZH], b:[0,  ZH], n:[0, -1], pil:[-15.55, -10, -5.05] },
+  { a:[-16, -ZH], b:[-16, ZH], n:[1, 0], pil:[-2.6, 2.6] },
+  { a:[-WT/2, -ZH], b:[-WT/2, ZH], n:[-1, 0], pil:[], door:true },
+  { a:[0, -ZH], b:[16, -ZH], n:[0, 1], pil:[5.5, 10.5, 15.55] },
+  { a:[0,  ZH], b:[16,  ZH], n:[0, -1], pil:[5.5, 10.5, 15.55] },
+  { a:[16, -ZH], b:[16, ZH], n:[-1, 0], pil:[-2.6, 2.6], door:true },
+  { a:[WT/2, -ZH], b:[WT/2, ZH], n:[1, 0], pil:[], door:true },
+  // the digital corridor: works hang close together, so no pilasters
+  { a:[DIG_X[0], -CZ], b:[DIG_X[1], -CZ], n:[0, 1], pil:[], dig:true },
+  { a:[DIG_X[0],  CZ], b:[DIG_X[1],  CZ], n:[0, -1], pil:[], dig:true },
+  { a:[DIG_X[1], -CZ], b:[DIG_X[1], CZ], n:[-1, 0], pil:[], dig:true },
+  { a:[DIG_X[0], -CZ], b:[DIG_X[0], CZ], n:[1, 0], pil:[], door:true, dig:true },
+];
+WALLS.forEach(W => { W.plaster = W.dig || Math.min(W.a[0], W.b[0]) < 0 ? plasterOil : plasterMat; });
+const alongX = W => W.a[1] === W.b[1];
+function strip(W, s0, s1, y, h, depth, mat = W.plaster){
+  const ax = alongX(W), mid = (s0 + s1)/2, len = s1 - s0;
+  const m = new THREE.Mesh(worldBox(ax ? len : depth, h, ax ? depth : len), mat);
+  m.position.set((ax ? mid : W.a[0]) + W.n[0]*depth/2, y, (ax ? W.a[1] : mid) + W.n[1]*depth/2); scene.add(m);
+}
+function panel(W, c0, c1, y0, y1){
+  const t = 0.04, d = 0.025;
+  strip(W, c0, c1, y0 + t/2, t, d); strip(W, c0, c1, y1 - t/2, t, d);
+  strip(W, c0, c0 + t, (y0 + y1)/2, y1 - y0, d); strip(W, c1 - t, c1, (y0 + y1)/2, y1 - y0, d);
+}
+function pilaster(W, p){
+  const ax = alongX(W), x = ax ? p : W.a[0], z = ax ? W.a[1] : p;
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(W.n[0], W.n[1]); scene.add(g);
+  const add = (w, h, d, y, mat = W.plaster, zz = d/2) => { const m = new THREE.Mesh(worldBox(w, h, d), mat); m.position.set(0, y, zz); g.add(m); };
+  const top = H - 0.345, s0 = 0.38, s1 = top - 0.3;
+  add(0.6, 0.32, 0.22, 0.16); add(0.52, 0.06, 0.19, 0.35);                      // plinth
+  add(0.42, s1 - s0, 0.13, (s0 + s1)/2);                                         // shaft
+  for (const fx of [-0.12, 0, 0.12]){ const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, s1 - s0 - 0.3, 0.012), fluteMat); m.position.set(fx, (s0 + s1)/2, 0.136); g.add(m); }
+  add(0.5, 0.06, 0.17, s1 + 0.03); add(0.56, 0.16, 0.2, s1 + 0.14); add(0.66, 0.08, 0.25, top - 0.04);   // capital
+  const hw = 0.33, d = 0.25;
+  if (ax) colliders.push({ minX:x - hw, maxX:x + hw, minZ:Math.min(z, z + W.n[1]*d), maxZ:Math.max(z, z + W.n[1]*d) });
+  else colliders.push({ minX:Math.min(x, x + W.n[0]*d), maxX:Math.max(x, x + W.n[0]*d), minZ:z - hw, maxZ:z + hw });
+}
+for (const W of WALLS){
+  const ax = alongX(W), s0 = ax ? W.a[0] : W.a[1], s1 = ax ? W.b[0] : W.b[1];
+  [[H - 0.07, 0.14, 0.26], [H - 0.19, 0.10, 0.17], [H - 0.27, 0.06, 0.10], [H - 0.315, 0.03, 0.06]].forEach(([y, h, d]) => strip(W, s0 - 0.26, s1 + 0.26, y, h, d));
+  if (!W.door) strip(W, s0, s1, H - 0.8, 0.04, 0.03);                            // picture rail
+  const segs = W.door ? [[s0, -DOOR_HALF - 0.14], [DOOR_HALF + 0.14, s1]] : [[s0, s1]];
+  let pieces = segs;
+  for (const p of W.pil) pieces = pieces.flatMap(([u, v]) => (p + 0.4 <= u || p - 0.4 >= v) ? [[u, v]] : [[u, p - 0.4], [p + 0.4, v]].filter(([q, r]) => r - q > 0.3));
+  for (const [u, v] of segs){
+    strip(W, u, v, 0.09, 0.18, 0.035); strip(W, u, v, 0.19, 0.025, 0.05);          // skirting
+    strip(W, u, v, 0.95, 0.07, 0.05); strip(W, u, v, 0.9, 0.025, 0.035);           // chair rail
+  }
+  for (const [u, v] of pieces){
+    const avail = v - u - 0.3; if (avail < 0.6) continue;
+    const count = Math.max(1, Math.round(avail/1.8)), pw = avail/count;
+    for (let i = 0; i < count; i++){ const c0 = u + 0.15 + i*pw + 0.1; panel(W, c0, c0 + pw - 0.2, 0.32, 0.78); }
+  }
+  W.pil.forEach(p => pilaster(W, p));
+}
+for (const bx of [-15.55, -10, -5.05, 5.5, 10.5, 15.55]){                       // coffered beams over the pilasters
+  box(0.4, 0.28, ZH*2, bx, H - 0.14, 0, bx < 0 ? beamOilMat : beamMat, false);
+  box(0.48, 0.04, ZH*2, bx, H - 0.3, 0, bx < 0 ? plasterOil : plasterMat, false);
+}
+for (let bx = DIG_X[0] + 3.4; bx < DIG_X[1] - 1; bx += 5.2){                    // beams marching down the corridor
+  box(0.4, 0.28, CZ*2, bx, H - 0.14, 0, beamOilMat, false);
+  box(0.48, 0.04, CZ*2, bx, H - 0.3, 0, plasterOil, false);
+}
+// free-standing columns and an entablature framing the doorway
+function column(x, z){
+  const top = H - 0.36, add = (geo, y) => { const m = new THREE.Mesh(geo, plasterMat); m.position.set(x, y, z); scene.add(m); };
+  add(new THREE.BoxGeometry(0.62, 0.3, 0.62), 0.15);
+  add(new THREE.CylinderGeometry(0.27, 0.29, 0.1, 28), 0.35);
+  add(new THREE.CylinderGeometry(0.19, 0.22, top - 0.72, 28), 0.4 + (top - 0.72)/2);
+  add(new THREE.CylinderGeometry(0.29, 0.2, 0.22, 28), top - 0.21);
+  add(new THREE.BoxGeometry(0.66, 0.1, 0.66), top - 0.05);
+  colliders.push({ minX:x - 0.32, maxX:x + 0.32, minZ:z - 0.32, maxZ:z + 0.32 });
+}
+for (const sx of [-1, 1]){
+  for (const sz of [-1, 1]) column(sx*0.72, sz*(DOOR_HALF + 0.62));
+  box(0.1, 0.24, DOOR_HALF*2 + 0.5, sx*(WT/2 + 0.05), DOOR_H + 0.2, 0, plasterMat, false);
+  box(0.14, 0.06, DOOR_HALF*2 + 0.62, sx*(WT/2 + 0.07), DOOR_H + 0.35, 0, plasterMat, false);
+}
+
+// doorway casing: a frame with no door, on both faces + lined jambs
+const cw = 0.14, cd = 0.04;
+function casing(cx){
+  for (const s of [-1, 1]){
+    const x = cx + s*(WT/2 + cd/2);
+    box(cd, DOOR_H + cw, cw, x, (DOOR_H + cw)/2, -(DOOR_HALF + cw/2), casingMat, false);
+    box(cd, DOOR_H + cw, cw, x, (DOOR_H + cw)/2,  (DOOR_HALF + cw/2), casingMat, false);
+    box(cd, cw, DOOR_HALF*2 + cw*2, x, DOOR_H + cw/2, 0, casingMat, false);
+  }
+  box(WT + 0.02, DOOR_H, 0.025, cx, DOOR_H/2, -DOOR_HALF + 0.012, casingMat, false);
+  box(WT + 0.02, DOOR_H, 0.025, cx, DOOR_H/2,  DOOR_HALF - 0.012, casingMat, false);
+  box(WT + 0.02, 0.025, DOOR_HALF*2, cx, DOOR_H - 0.012, 0, casingMat, false);
+  const doorLight = new THREE.PointLight(0xffd9a8, 0.55, 5.5, 2);
+  doorLight.position.set(cx, 2.9, 0); scene.add(doorLight);
+}
+casing(0); casing(DRAW_X[1] + WT/2);
+// the corridor has no spotlights (the digital works are lit from within), so a few soft, cool lamps down its length
+for (let fx = DIG_X[0] + 4.5; fx < DIG_X[1]; fx += 8){
+  const fill = new THREE.PointLight(0xc9d3f0, 0.3, 9, 1.3);
+  fill.position.set(fx, 3.9, 0); scene.add(fill);
+}
+
+// ceiling tracks for the spotlights
+for (const [x0, x1] of [OIL_X, DRAW_X]) for (const zs of [-1, 1])
+  box(x1 - x0 - 0.8, 0.035, 0.05, (x0 + x1)/2, H - 0.03, zs*(ZH - 1.7), metalMat, false);
+box(0.05, 0.035, ZH*2 - 3.4, DRAW_X[1] - 1.7, H - 0.03, 0, metalMat, false);
+box(0.05, 0.035, ZH*2 - 3.4, OIL_X[0] + 1.7, H - 0.03, 0, metalMat, false);
+
+// benches: all honey-toned wood, with a soft pool of light so they read against the carpet
+for (const bx of [-7.5, 8, DIG_X[0] + 9, DIG_X[0] + 18.5]){   // two in the long corridor, a third of the way along each
+  box(2.6, 0.09, 0.56, bx, 0.43, 0, woodMat);
+  box(2.4, 0.06, 0.06, bx, 0.355, -0.22, woodMat, false);
+  box(2.4, 0.06, 0.06, bx, 0.355,  0.22, woodMat, false);
+  for (const sx of [-1.1, 1.1]){
+    box(0.07, 0.39, 0.07, bx + sx, 0.195, -0.22, woodMat, false);
+    box(0.07, 0.39, 0.07, bx + sx, 0.195,  0.22, woodMat, false);
+    box(0.05, 0.05, 0.44, bx + sx, 0.09, 0, woodMat, false);
+  }
+  const glow = new THREE.PointLight(0xffe2b8, 0.45, 3.2, 2);
+  glow.position.set(bx, 2.1, 0); scene.add(glow);
+}
+
+/* ---------------- spotlights ---------------- */
+const canGeo = new THREE.CylinderGeometry(0.055, 0.075, 0.22, 20);
+const lensGeo = new THREE.CircleGeometry(0.06, 20);
+const lensMat = new THREE.MeshBasicMaterial({ color:0xffe7c2 });
+function addSpot(from, to, angle, intensity = 3.1){
+  const s = new THREE.SpotLight(0xfff0d8, intensity, 11, angle, 0.55, 1.15);
+  s.position.copy(from); s.target.position.copy(to);
+  scene.add(s); scene.add(s.target);
+  const can = new THREE.Mesh(canGeo, metalMat); can.position.copy(from); can.lookAt(to); can.rotateX(Math.PI/2); scene.add(can);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, H - from.y), metalMat);
+  stem.position.set(from.x, (H + from.y)/2, from.z); scene.add(stem);
+  const lens = new THREE.Mesh(lensGeo, lensMat); const dir = to.clone().sub(from).normalize();
+  lens.position.copy(from).addScaledVector(dir, 0.112); lens.lookAt(from.clone().addScaledVector(dir, -1)); scene.add(lens);
+  return s;
+}
+
+/* ---------------- wall text ---------------- */
+const signs = [];
+function textPlane(linesFn, w, h, opacity = 0.92){
+  const c = document.createElement('canvas'); c.width = Math.round(w*512); c.height = Math.round(h*512); const t = tex(c);
+  const redraw = () => {
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+    g.direction = lang === 'fa' ? 'rtl' : 'ltr'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const L of linesFn()){
+      let size = L.size; const setFont = () => { g.font = `${L.weight} ${size}px ${L.family}`; }; setFont();
+      while (g.measureText(L.text).width > c.width*0.94 && size > 12){ size *= 0.93; setFont(); }
+      g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 10; g.shadowOffsetY = 3;   // painted-on lettering needs a little lift off the wall
+      g.fillStyle = L.color; g.fillText(L.text, c.width/2, L.y*c.height);
+    }
+    t.needsUpdate = true;
+  };
+  redraw(); signs.push(redraw);
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map:t, transparent:true, opacity, depthWrite:false }));
+}
+
+/* ---------------- painting generators (placeholders) ---------------- */
+function painterly(base, r, seed){
+  const W = base.width, Hh = base.height, src = base.getContext('2d').getImageData(0, 0, W, Hh).data;
+  const c = document.createElement('canvas'); c.width = W; c.height = Hh; const g = c.getContext('2d');
+  g.filter = 'blur(5px)'; g.drawImage(base, 0, 0); g.filter = 'none';
+  const area = W*Hh;
+  for (const [size, count] of [[24, area/900], [11, area/170], [4.5, area/110]]){
+    for (let i = 0; i < count; i++){
+      const x = r()*W, y = r()*Hh, p = ((y|0)*W + (x|0))*4, j = (r() - .5)*30;
+      g.fillStyle = `rgba(${src[p]+j|0},${src[p+1]+j|0},${src[p+2]+j*.8|0},${0.55 + r()*0.4})`;
+      const a = Math.sin(x*0.007 + seed)*1.3 + Math.cos(y*0.01 + seed*2)*1.1, ca = Math.cos(a), sa = Math.sin(a);
+      g.setTransform(ca, sa, -sa, ca, x, y);
+      g.beginPath(); g.ellipse(0, 0, size*(0.6 + r()*0.9), size*0.3*(0.6 + r()*0.6), 0, 0, Math.PI*2); g.fill();
+    }
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  // canvas weave
+  const p = document.createElement('canvas'); p.width = p.height = 6; const pg = p.getContext('2d');
+  pg.fillStyle = 'rgba(255,255,255,.05)'; pg.fillRect(0, 0, 6, 1); pg.fillRect(0, 3, 6, 1);
+  pg.fillStyle = 'rgba(0,0,0,.07)'; pg.fillRect(0, 0, 1, 6); pg.fillRect(3, 0, 1, 6);
+  g.fillStyle = g.createPattern(p, 'repeat'); g.fillRect(0, 0, W, Hh);
+  const v = g.createRadialGradient(W/2, Hh/2, Math.min(W, Hh)*.35, W/2, Hh/2, Math.max(W, Hh)*.8);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.28)'); g.fillStyle = v; g.fillRect(0, 0, W, Hh);
+  return c;
+}
+function lin(g, x0, y0, x1, y1, stops){ const gr = g.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, c]) => gr.addColorStop(o, c)); return gr; }
+function rad(g, x, y, r0, r1, stops, x1 = x, y1 = y){ const gr = g.createRadialGradient(x, y, r0, x1, y1, r1); stops.forEach(([o, c]) => gr.addColorStop(o, c)); return gr; }
+function ridge(g, W, Hh, baseY, amp, r, color){
+  const ph = [r()*6, r()*6, r()*6]; g.fillStyle = color; g.beginPath(); g.moveTo(0, Hh);
+  for (let x = 0; x <= W; x += 8){ const y = baseY + Math.sin(x*0.004 + ph[0])*amp + Math.sin(x*0.011 + ph[1])*amp*.45 + Math.sin(x*0.03 + ph[2])*amp*.12; g.lineTo(x, y); }
+  g.lineTo(W, Hh); g.closePath(); g.fill();
+}
+const OIL = {
+  landscape(g, W, H, r){
+    g.fillStyle = lin(g, 0, 0, 0, H*.7, [[0,'#24183a'],[.45,'#7b2f45'],[.75,'#d0603a'],[1,'#f3b85c']]); g.fillRect(0, 0, W, H);
+    g.fillStyle = rad(g, W*.63, H*.55, 0, H*.32, [[0,'rgba(255,226,160,1)'],[.18,'rgba(255,200,120,.9)'],[1,'rgba(255,160,90,0)']]); g.fillRect(0, 0, W, H);
+    ['#6a3040','#462338','#2a1729','#150c17'].forEach((c, k) => ridge(g, W, H, H*(.56 + k*.1), H*(.05 - k*.006), r, c));
+  },
+  sea(g, W, H, r){
+    g.fillStyle = lin(g, 0, 0, 0, H*.6, [[0,'#060d1c'],[1,'#1e3a5c']]); g.fillRect(0, 0, W, H*.6);
+    g.fillStyle = rad(g, W*.3, H*.24, 0, H*.4, [[0,'rgba(240,232,205,.9)'],[.12,'rgba(220,215,190,.5)'],[1,'rgba(120,140,170,0)']]); g.fillRect(0, 0, W, H*.6);
+    g.fillStyle = '#efe6c9'; g.beginPath(); g.arc(W*.3, H*.24, H*.055, 0, Math.PI*2); g.fill();
+    g.fillStyle = lin(g, 0, H*.6, 0, H, [[0,'#14304c'],[1,'#03070f']]); g.fillRect(0, H*.6, W, H*.4);
+    for (let i = 0; i < 140; i++){ const y = H*.6 + Math.pow(r(), 1.4)*H*.4, w = (10 + r()*70)*(1 + (y - H*.6)/H*3); const x = W*.3 + (r() - .5)*(40 + (y - H*.6)*1.2) - w/2; g.fillStyle = `rgba(230,225,200,${.15 + r()*.5})`; g.fillRect(x, y, w, 2 + r()*3); }
+    for (let i = 0; i < 90; i++){ g.fillStyle = `rgba(90,130,170,${r()*.3})`; g.fillRect(r()*W, H*.6 + r()*H*.4, 30 + r()*120, 2); }
+  },
+  stillLife(g, W, H, r){
+    g.fillStyle = rad(g, W*.3, H*.3, 0, W*.9, [[0,'#3a2817'],[1,'#070504']]); g.fillRect(0, 0, W, H);
+    g.fillStyle = lin(g, 0, H*.68, 0, H, [[0,'#4a2c16'],[1,'#120a05']]); g.fillRect(0, H*.68, W, H*.32);
+    g.fillStyle = 'rgba(255,210,150,.35)'; g.fillRect(0, H*.68, W, 4);
+    g.fillStyle = rad(g, W*.38, H*.55, 0, W*.3, [[0,'#e6dccb'],[.6,'#8f877a'],[1,'#2b2620']]);
+    g.beginPath(); g.moveTo(W*.2, H*.72); g.bezierCurveTo(W*.35, H*.6, W*.55, H*.66, W*.75, H*.74); g.lineTo(W*.8, H*.86); g.bezierCurveTo(W*.55, H*.8, W*.35, H*.84, W*.15, H*.88); g.fill();
+    const vase = (x, w, h, c1, c2) => { g.fillStyle = rad(g, x - w*.3, H*.68 - h*.6, 0, w*1.1, [[0,c1],[1,c2]]); g.beginPath(); g.ellipse(x, H*.7 - h*.45, w*.5, h*.45, 0, 0, Math.PI*2); g.fill(); g.fillRect(x - w*.14, H*.7 - h*1.05, w*.28, h*.3); g.beginPath(); g.ellipse(x, H*.7 - h*1.05, w*.22, w*.05, 0, 0, Math.PI*2); g.fill(); };
+    vase(W*.42, W*.24, H*.42, '#c4643c', '#2a0d07');
+    vase(W*.68, W*.12, H*.24, '#5d7a8a', '#0d161b');
+    const fruit = (x, y, rr, c1, c2) => { g.fillStyle = rad(g, x - rr*.35, y - rr*.4, 0, rr*1.2, [[0,c1],[.4,c2],[1,'#100804']]); g.beginPath(); g.arc(x, y, rr, 0, Math.PI*2); g.fill(); };
+    fruit(W*.2, H*.72, W*.055, '#f1d37a', '#a1781f'); fruit(W*.28, H*.75, W*.05, '#ff7a5c', '#8c1c13'); fruit(W*.57, H*.76, W*.045, '#ffd28a', '#b05c16');
+  },
+  abstract(g, W, H){
+    g.fillStyle = '#3e0c10'; g.fillRect(0, 0, W, H);
+    g.filter = 'blur(14px)';
+    g.fillStyle = '#b7361e'; g.fillRect(W*.1, H*.07, W*.8, H*.5);
+    g.fillStyle = '#e08431'; g.fillRect(W*.12, H*.64, W*.76, H*.27);
+    g.fillStyle = 'rgba(250,180,90,.4)'; g.fillRect(W*.16, H*.12, W*.68, H*.12);
+    g.filter = 'none';
+  },
+  portrait(g, W, H, r){
+    g.fillStyle = rad(g, W*.62, H*.35, 0, H*.8, [[0,'#2c2219'],[1,'#060404']]); g.fillRect(0, 0, W, H);
+    g.fillStyle = '#17110d'; g.beginPath(); g.moveTo(W*.05, H); g.bezierCurveTo(W*.1, H*.72, W*.3, H*.66, W*.5, H*.66); g.bezierCurveTo(W*.72, H*.66, W*.9, H*.72, W*.95, H); g.fill();
+    g.fillStyle = 'rgba(200,140,90,.25)'; g.beginPath(); g.moveTo(W*.16, H); g.bezierCurveTo(W*.2, H*.76, W*.34, H*.7, W*.48, H*.69); g.lineTo(W*.48, H*.72); g.bezierCurveTo(W*.34, H*.74, W*.24, H*.8, W*.2, H); g.fill();
+    g.fillStyle = rad(g, W*.42, H*.48, 0, W*.18, [[0,'#7a4c32'],[1,'#2a1810']]); g.fillRect(W*.4, H*.52, W*.2, H*.16);
+    g.fillStyle = rad(g, W*.4, H*.33, W*.02, W*.32, [[0,'#e2b08a'],[.45,'#a3684a'],[1,'#1c100a']]);
+    g.beginPath(); g.ellipse(W*.5, H*.38, W*.2, H*.18, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#0d0907'; g.beginPath(); g.ellipse(W*.52, H*.27, W*.23, H*.12, -0.15, Math.PI, Math.PI*2.05); g.fill();
+    g.fillStyle = 'rgba(20,10,6,.6)'; g.beginPath(); g.ellipse(W*.58, H*.4, W*.12, H*.17, 0, -1.2, 1.4); g.fill();
+  },
+  forest(g, W, H, r){
+    g.fillStyle = lin(g, 0, 0, 0, H, [[0,'#a9b6a0'],[.5,'#5b6d5c'],[1,'#121a14']]); g.fillRect(0, 0, W, H);
+    for (let layer = 0; layer < 4; layer++){
+      const shade = [180, 120, 70, 30][layer], n = 7 + layer*3;
+      for (let i = 0; i < n; i++){ const x = r()*W, w = (6 + layer*9)*(0.6 + r()*0.8); g.fillStyle = `rgba(${shade*.55|0},${shade*.62|0},${shade*.55|0},${0.55 + layer*.12})`; g.fillRect(x, 0, w, H); }
+      g.fillStyle = `rgba(160,175,155,${.22 - layer*.04})`; g.fillRect(0, 0, W, H);
+    }
+    g.fillStyle = 'rgba(255,245,215,.16)';
+    for (let i = 0; i < 4; i++){ const x = W*(.2 + i*.18); g.beginPath(); g.moveTo(x, 0); g.lineTo(x + W*.08, 0); g.lineTo(x + W*.35, H); g.lineTo(x + W*.2, H); g.fill(); }
+    g.fillStyle = lin(g, 0, H*.82, 0, H, [[0,'rgba(30,40,25,0)'],[1,'#0b100b']]); g.fillRect(0, H*.82, W, H*.18);
+  }
+};
+function paintOil(gen, aspect, seed){
+  const base = makeCanvas(aspect, 1024), g = base.getContext('2d'), r = rng(seed*131 + 17);
+  OIL[gen](g, base.width, base.height, r);
+  return painterly(base, r, seed);
+}
+
+const PAPER = [233, 226, 209];
+function paper(aspect, seed){
+  const c = makeCanvas(aspect, 1024), g = c.getContext('2d'), W = c.width, Hh = c.height, r = rng(seed*97 + 3);
+  g.fillStyle = `rgb(${PAPER})`; g.fillRect(0, 0, W, Hh);
+  for (let i = 0; i < 9000; i++){ g.fillStyle = `rgba(${r() < .5 ? '90,80,60' : '255,255,250'},${r()*0.06})`; g.fillRect(r()*W, r()*Hh, 1 + r()*2, 1 + r()*2); }
+  return { c, g, W, H:Hh, r };
+}
+function finishPaper({ g, W, H }){
+  const v = g.createRadialGradient(W/2, H/2, Math.min(W, H)*.3, W/2, H/2, Math.max(W, H)*.78);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(120,95,60,.2)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
+}
+function graphite(g, a = .75, w = 1.5){ g.strokeStyle = `rgba(36,32,29,${a})`; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; }
+function path(g, r, pts, jit = 1.4){ g.beginPath(); pts.forEach((p, i) => { const x = p[0] + (r() - .5)*jit, y = p[1] + (r() - .5)*jit; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+function ellPts(cx, cy, rx, ry, a0 = 0, a1 = Math.PI*2, n = 72){ const p = []; for (let i = 0; i <= n; i++){ const t = a0 + (a1 - a0)*i/n; p.push([cx + Math.cos(t)*rx, cy + Math.sin(t)*ry]); } return p; }
+function hatch(g, r, x0, y0, x1, y1, ang, sp, a, w = 1.1){
+  const cx = (x0 + x1)/2, cy = (y0 + y1)/2, L = Math.hypot(x1 - x0, y1 - y0)/2, dx = Math.cos(ang), dy = Math.sin(ang);
+  graphite(g, a, w);
+  for (let s = -L; s <= L; s += sp*(0.75 + r()*0.5)){
+    const ox = cx - dy*s, oy = cy + dx*s, l = L*(0.85 + r()*0.3);
+    g.beginPath(); g.moveTo(ox - dx*l + (r() - .5)*4, oy - dy*l + (r() - .5)*4); g.lineTo(ox + dx*l + (r() - .5)*4, oy + dy*l + (r() - .5)*4); g.stroke();
+  }
+}
+function lift(g, x, y, rr){ g.fillStyle = rad(g, x, y, 0, rr, [[0,`rgba(${PAPER},1)`],[.5,`rgba(${PAPER},.75)`],[1,`rgba(${PAPER},0)`]]); g.fillRect(x - rr, y - rr, rr*2, rr*2); }
+function clipPoly(g, pts){ g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.clip(); }
+function curve(g, r, p, times = 3, jit = 6, a = .6, w = 1.6){
+  for (let k = 0; k < times; k++){
+    graphite(g, a*(0.6 + r()*0.5), w*(0.6 + r()*0.8)); const J = () => (r() - .5)*jit;
+    g.beginPath(); g.moveTo(p[0][0] + J(), p[0][1] + J()); g.bezierCurveTo(p[1][0] + J(), p[1][1] + J(), p[2][0] + J(), p[2][1] + J(), p[3][0] + J(), p[3][1] + J()); g.stroke();
+  }
+}
+const DRAW = {
+  solids(P){
+    const { g, W, H, r } = P, gy = H*.74;
+    graphite(g, .5, 1.2); path(g, r, [[W*.04, gy], [W*.96, gy]], 2);
+    g.save(); clipPoly(g, [[0, gy], [W, gy], [W, H], [0, H]]); hatch(g, r, 0, gy, W, H, 0.12, 9, .16); g.restore();
+    const sx = W*.32, sy = gy - W*.16, R = W*.155;
+    g.save(); g.beginPath(); g.ellipse(sx + R*.7, gy + 6, R*1.25, R*.22, 0, 0, Math.PI*2); g.clip(); hatch(g, r, sx - R, gy - R*.3, sx + R*2.4, gy + R*.4, 0.2, 4, .55); g.restore();
+    g.save(); g.beginPath(); g.arc(sx, sy, R, 0, Math.PI*2); g.clip();
+    hatch(g, r, sx - R, sy - R, sx + R, sy + R, -0.8, 5, .5); hatch(g, r, sx - R, sy - R, sx + R, sy + R, 0.55, 6, .35);
+    lift(g, sx - R*.42, sy - R*.45, R*1.15); g.restore();
+    graphite(g, .85, 1.8); path(g, r, ellPts(sx, sy, R, R)); graphite(g, .4, 1); path(g, r, ellPts(sx, sy, R*1.01, R*.99, 0.3, 4));
+    const s = W*.19, fx = W*.56, fy = gy - s, ox = s*.42, oy = -s*.32;
+    const front = [[fx, fy], [fx + s, fy], [fx + s, gy], [fx, gy]], side = [[fx + s, fy], [fx + s + ox, fy + oy], [fx + s + ox, gy + oy], [fx + s, gy]], top = [[fx, fy], [fx + ox, fy + oy], [fx + s + ox, fy + oy], [fx + s, fy]];
+    g.save(); clipPoly(g, side); hatch(g, r, fx + s, fy + oy, fx + s + ox, gy, 1.2, 4, .6); hatch(g, r, fx + s, fy + oy, fx + s + ox, gy, -0.4, 5, .4); g.restore();
+    g.save(); clipPoly(g, front); hatch(g, r, fx, fy, fx + s, gy, 0.9, 9, .28); g.restore();
+    g.save(); g.beginPath(); g.moveTo(fx + s, gy); g.lineTo(fx + s + ox + s*.9, gy); g.lineTo(fx + s + ox, gy + oy); g.closePath(); g.clip(); hatch(g, r, fx + s, gy + oy, fx + s*2.4, gy, 0.1, 4, .5); g.restore();
+    graphite(g, .85, 1.8); [front, side, top].forEach(f => path(g, r, [...f, f[0]]));
+  },
+  tree(P){
+    const { g, W, H, r } = P;
+    const branch = (x, y, a, len, d) => {
+      const x2 = x + Math.cos(a)*len, y2 = y + Math.sin(a)*len;
+      for (let k = 0; k < (d > 6 ? 3 : 1); k++){ graphite(g, .55 + d*.04, Math.max(.6, d*1.1)); path(g, r, [[x, y], [(x + x2)/2 + (r() - .5)*len*.12, (y + y2)/2], [x2, y2]], d*.8); }
+      if (d <= 0) return;
+      const n = d > 7 ? 2 : 2 + (r() < .35 ? 1 : 0);
+      for (let i = 0; i < n; i++) branch(x2, y2, a + (i - (n - 1)/2)*(0.45 + r()*0.3) + (r() - .5)*.25, len*(0.66 + r()*0.12), d - 1);
+    };
+    branch(W*.5, H*.88, -Math.PI/2 + (r() - .5)*.1, H*.2, 9);
+    g.save(); clipPoly(g, [[W*.47, H*.88], [W*.53, H*.88], [W*.52, H*.68], [W*.49, H*.68]]); hatch(g, r, W*.45, H*.66, W*.55, H*.9, 1.4, 2.5, .7, 1.4); g.restore();
+    for (let i = 0; i < 140; i++){ const x = W*.08 + r()*W*.84, y = H*.88 + (r() - .4)*H*.03; graphite(g, .35 + r()*.3, 1); path(g, r, [[x, y], [x + (r() - .5)*10, y - 6 - r()*14]], 1); }
+    graphite(g, .45, 1.2); path(g, r, [[W*.05, H*.885], [W*.95, H*.885]], 3);
+  },
+  perspective(P){
+    const { g, W, H, r } = P, vx = W*.5, vy = H*.46, L = (p, t) => [vx + (p[0] - vx)*t, vy + (p[1] - vy)*t];
+    graphite(g, .4, 1); path(g, r, [[0, vy], [W, vy]], 1);
+    for (const side of [-1, 1]){
+      const ex = side < 0 ? 0 : W, top = [ex, H*.04], bot = [ex, H*.96], ts = [];
+      for (let k = 0; k < 9; k++) ts.push(0.16 + Math.pow(k/8, 1.6)*0.84);
+      graphite(g, .8, 1.6); path(g, r, [L(top, ts[0]), top]); path(g, r, [L(bot, ts[0]), bot]);
+      ts.forEach(t => { graphite(g, .7, 1.4); path(g, r, [L(top, t), L(bot, t)]); });
+      for (let k = 0; k < ts.length - 1; k++){
+        const t0 = ts[k] + (ts[k+1] - ts[k])*.25, t1 = ts[k] + (ts[k+1] - ts[k])*.75;
+        for (const f of [.2, .45]){
+          const fy0 = f, fy1 = f + .15, q = (t, fy) => { const a = L(top, t), b = L(bot, t); return [a[0], a[1] + (b[1] - a[1])*fy]; };
+          const win = [q(t0, fy0), q(t1, fy0), q(t1, fy1), q(t0, fy1)];
+          g.save(); clipPoly(g, win); if (side > 0) hatch(g, r, Math.min(win[0][0], win[1][0]), win[0][1] - 40, Math.max(win[0][0], win[1][0]), win[3][1] + 40, 1.3, 3, .55); g.restore();
+          graphite(g, .65, 1.1); path(g, r, [...win, win[0]], 1);
+        }
+      }
+      if (side > 0){ g.save(); clipPoly(g, [L(top, .16), top, bot, L(bot, .16)]); hatch(g, r, W*.5, 0, W, H, 1.5, 7, .18); g.restore(); }
+    }
+    graphite(g, .6, 1.3); path(g, r, [[vx, vy], [W*.3, H]]); path(g, r, [[vx, vy], [W*.7, H]]);
+    for (let k = 1; k < 7; k++){ const t0 = Math.pow(k/7, 1.5), t1 = t0 + .05; graphite(g, .6, 1.5 + t0*3); path(g, r, [L([vx, H], t0), L([vx, H], t1)], 1); }
+  },
+  gesture(P){
+    const { g, W, H, r } = P, s = W/600;
+    for (let k = 0; k < 4; k++){ graphite(g, .5 + r()*.3, 1.4 + r()*1.6); path(g, r, ellPts(W*.52 + (r() - .5)*6, H*.13, 38*s, 46*s, -0.3 + r(), Math.PI*2 + r()), 5); }
+    const C = (a, b, c, d, t = 4, w = 2.6) => curve(g, r, [a, b, c, d].map(([x, y]) => [x*W, y*H]), t, 14*s, .7, w*s);
+    C([.52,.19],[.5,.3],[.44,.4],[.47,.53], 5, 3.2);
+    C([.38,.25],[.46,.22],[.56,.23],[.66,.27], 4);
+    C([.4,.52],[.46,.5],[.52,.51],[.58,.55], 4);
+    C([.38,.25],[.33,.33],[.3,.4],[.33,.47]); C([.33,.47],[.35,.5],[.39,.52],[.42,.5], 2, 2);
+    C([.66,.27],[.73,.22],[.78,.15],[.76,.08]); C([.76,.08],[.75,.06],[.73,.05],[.72,.06], 2, 2);
+    C([.44,.53],[.42,.66],[.38,.75],[.36,.9], 5, 3); C([.36,.9],[.34,.92],[.3,.93],[.27,.93], 3);
+    C([.56,.55],[.6,.66],[.63,.77],[.6,.89], 5, 3); C([.6,.89],[.63,.91],[.67,.92],[.7,.92], 3);
+    g.save(); g.beginPath(); g.ellipse(W*.48, H*.93, W*.28, H*.025, 0, 0, Math.PI*2); g.clip(); hatch(g, r, W*.2, H*.9, W*.8, H*.96, 0.15, 4, .5, 1.6); g.restore();
+  },
+  flower(P){
+    const { g, W, H, r } = P, cx = W*.5, cy = H*.32, R = W*.2;
+    curve(g, r, [[cx, cy + R*.3], [cx - W*.05, H*.55], [cx + W*.06, H*.75], [cx - W*.02, H*.96]], 3, 4, .8, 2.2);
+    for (const [sx, dir] of [[.62, -1], [.78, 1]]){
+      const by = H*sx, bx = cx + (dir < 0 ? -W*.01 : W*.015), tip = [bx + dir*W*.3, by - H*.08];
+      const up = [[bx, by], [bx + dir*W*.1, by - H*.1], [tip[0] - dir*W*.05, tip[1] - H*.04], tip], dn = [[bx, by], [bx + dir*W*.12, by + H*.03], [tip[0] - dir*W*.02, tip[1] + H*.03], tip];
+      g.save(); g.beginPath(); g.moveTo(...up[0]); g.bezierCurveTo(...up[1], ...up[2], ...up[3]); g.bezierCurveTo(...dn[2], ...dn[1], ...dn[0]); g.clip(); hatch(g, r, bx - W*.35, by - H*.2, bx + W*.35, by + H*.1, dir*0.5 + 1, 5, .4); g.restore();
+      curve(g, r, up, 2, 3, .8, 1.8); curve(g, r, dn, 2, 3, .8, 1.8); curve(g, r, [[bx, by], [bx + dir*W*.1, by - H*.04], [tip[0] - dir*W*.08, tip[1]], tip], 1, 2, .5, 1);
+    }
+    const n = 8;
+    for (let i = 0; i < n; i++){
+      const a = i/n*Math.PI*2 + r()*.2, a1 = a - .33, a2 = a + .33, rr = R*(0.85 + r()*0.3);
+      const pts = [[cx, cy], [cx + Math.cos(a1)*rr*1.25, cy + Math.sin(a1)*rr*1.25], [cx + Math.cos(a2)*rr*1.25, cy + Math.sin(a2)*rr*1.25], [cx, cy]];
+      if (Math.sin(a) > .2){ g.save(); g.beginPath(); g.moveTo(cx, cy); g.bezierCurveTo(...pts[1], ...pts[2], cx, cy); g.clip(); hatch(g, r, cx - R*1.3, cy - R*1.3, cx + R*1.3, cy + R*1.3, a + .9, 6, .3); g.restore(); }
+      curve(g, r, pts, 2, 3, .85, 1.7);
+    }
+    g.save(); g.beginPath(); g.arc(cx, cy, R*.24, 0, Math.PI*2); g.clip(); hatch(g, r, cx - R*.3, cy - R*.3, cx + R*.3, cy + R*.3, .8, 3, .7); hatch(g, r, cx - R*.3, cy - R*.3, cx + R*.3, cy + R*.3, -.7, 3, .6); g.restore();
+    graphite(g, .9, 2); path(g, r, ellPts(cx, cy, R*.24, R*.24));
+  },
+  hills(P){
+    const { g, W, H, r } = P;
+    graphite(g, .35, 1); path(g, r, ellPts(W*.72, H*.22, W*.05, W*.05), 2);
+    for (let i = 0; i < 6; i++){ const y = H*(.12 + i*.04); hatch(g, r, W*(.05 + r()*.3), y, W*(.4 + r()*.3), y + 2, 0, 20, .12); }
+    const layers = [[.5, .04, .18, 11], [.62, .05, .32, 8], [.76, .06, .5, 5]];
+    layers.forEach(([by, amp, a, sp], k) => {
+      const ph = r()*6, pts = []; for (let x = -10; x <= W + 10; x += 10) pts.push([x, H*by + Math.sin(x*.006 + ph)*H*amp + Math.sin(x*.017 + ph*2)*H*amp*.35]);
+      g.save(); clipPoly(g, [...pts, [W + 10, H], [-10, H]]); g.fillStyle = `rgb(${PAPER})`; g.fillRect(0, 0, W, H); hatch(g, r, 0, H*by - H*.1, W, H, 0.25 + k*.3, sp, a); g.restore();
+      graphite(g, .75, 1.6); path(g, r, pts, 1.5);
+      if (k === 1) for (const fx of [.2, .27, .31, .58, .63]){
+        const p = pts[Math.round((fx*W + 10)/10)], h = H*(.16 + r()*.1), w = W*.022;
+        g.save(); g.beginPath(); g.ellipse(p[0], p[1] - h/2, w, h/2, 0, 0, Math.PI*2); g.clip(); g.fillStyle = `rgb(${PAPER})`; g.fill(); hatch(g, r, p[0] - w, p[1] - h, p[0] + w, p[1], 1.45, 2.4, .75, 1.3); g.restore();
+        graphite(g, .8, 1.3); path(g, r, ellPts(p[0], p[1] - h/2, w, h/2), 1.5);
+      }
+    });
+  },
+  drapery(P){
+    const { g, W, H, r } = P, top = H*.08, nail = [W*.5, top];
+    graphite(g, .9, 3); path(g, r, ellPts(nail[0], nail[1], 6, 6), 1);
+    const N = 26, lines = [];
+    for (let i = 0; i < N; i++){
+      const t = i/(N - 1), x0 = W*.5 + (t - .5)*W*.06, xb = W*(.1 + t*.8), ph = r()*6, f = .01 + r()*.006, pts = [];
+      for (let y = top; y <= H*.9; y += 10){ const k = (y - top)/(H*.82); pts.push([x0 + (xb - x0)*Math.pow(k, .8) + Math.sin(y*f + ph)*W*.025*k, y]); }
+      lines.push(pts);
+    }
+    for (let i = 0; i < N - 1; i += 2){
+      const poly = [...lines[i], ...lines[i+1].slice().reverse()];
+      g.save(); clipPoly(g, poly); hatch(g, r, 0, top, W, H, 1.35 + (i%4 ? .2 : -.2), 3.5 + (i%3)*2, .45 + r()*.25, 1.3); g.restore();
+    }
+    lines.forEach((pts, i) => { graphite(g, i%2 ? .5 : .85, i%2 ? 1 : 1.8); path(g, r, pts, 1.5); });
+    const hem = lines.map(l => l[l.length - 1]); graphite(g, .85, 2); path(g, r, hem.map(([x, y], i) => [x, y + Math.sin(i*1.3)*10]), 2);
+    for (let i = 0; i < 60; i++){ const y = top + r()*H*.8; lift(g, W*(.3 + r()*.4), y, 14 + r()*20); }
+  }
+};
+function paintDrawing(gen, aspect, seed){ const P = paper(aspect, seed); DRAW[gen](P); finishPaper(P); return P.c; }
+
+/* ---------------- plaques ---------------- */
+function sizeLabel(a){
+  if (!a.size) return D('digital_medium');   // digital works have no size in centimetres
+  const [p, q] = a.size, fa = n => FA(n).replace('.', '٫');
+  return lang === 'fa' ? `${fa(p)} × ${fa(q)} سانتی‌متر` : `${p} × ${q} cm`;
+}
+const titleOf = a => a.title ? a.title[lang] : '';
+function drawPlaque(c, a){   // navy label: title and size, or size alone
+  const g = c.getContext('2d'), rtl = lang === 'fa', title = titleOf(a), W = c.width, X = rtl ? W - 64 : 64;
+  g.fillStyle = '#1c2a4e'; g.fillRect(0, 0, W, c.height);
+  g.strokeStyle = 'rgba(201,168,104,.55)'; g.lineWidth = 4; g.strokeRect(18, 18, W - 36, c.height - 36);
+  g.direction = rtl ? 'rtl' : 'ltr'; g.textAlign = rtl ? 'right' : 'left'; g.textBaseline = 'alphabetic';
+  if (title){
+    let size = 100; const setFont = () => { g.font = `700 ${size}px "Markazi Text", serif`; }; setFont();
+    while (g.measureText(title).width > W - 128 && size > 40){ size -= 4; setFont(); }
+    g.fillStyle = '#f5f0e6'; g.fillText(title, X, 138);
+    g.fillStyle = '#c9a868'; g.fillRect(64, 176, W - 128, 3);
+    g.fillStyle = '#aebad0'; g.font = '400 50px Vazirmatn, Tahoma, sans-serif'; g.fillText(sizeLabel(a), X, 258);
+  } else {
+    g.fillStyle = '#d8deea'; g.font = '400 54px Vazirmatn, Tahoma, sans-serif'; g.fillText(sizeLabel(a), X, 112);
+  }
+}
+function plaque(a){ const c = document.createElement('canvas'); c.width = 1024; c.height = a.title ? 300 : 170; drawPlaque(c, a); return c; }
+
+/* ---------------- build artworks ---------------- */
+const placed = [];
+function wallFrame(a){
+  const hall = a.hall || a.room;   // works added later hang in the corridor whatever their kind
+  const [x0, x1] = { oil:OIL_X, draw:DRAW_X, digital:DIG_X }[hall], zh = hall === 'digital' ? CZ : ZH; let rotY, x, z;
+  if (a.wall === 'N'){ rotY = 0; x = a.at; z = -zh; }
+  else if (a.wall === 'S'){ rotY = Math.PI; x = a.at; z = zh; }
+  else if (a.wall === 'W'){ rotY = Math.PI/2; x = a.room === 'draw' ? x0 + WT/2 : x0; z = a.at; }   // the drawing room's west wall is the partition
+  else { rotY = -Math.PI/2; x = x1; z = a.at; }
+  return { x, z, rotY, n:new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY)) };
+}
+// phones run out of graphics memory on thirteen full-size photos, so they get a smaller copy of each
+function shrink(img, max){
+  const s = Math.min(1, max/Math.max(img.naturalWidth, img.naturalHeight));
+  if (s === 1) return img;
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+function loadImage(src){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+// smaller copies of the works carried inside the page, so phones never depend on the separate image files
+const EMBED = {}; // filled in by tools/embed.py when the page is built
+
+// picture quality, chosen by the visitor and remembered: how sharp the works are and how finely the screen is drawn
+const QUALITY = { low:{ img:900, ratio:1 }, medium:{ img:1600, ratio:1.5 }, high:{ img:0, ratio:2 } };   // img 0 = the full-size files
+let quality = isTouch ? 'medium' : 'high';
+try { const q = localStorage.getItem('gallery-quality'); if (QUALITY[q]) quality = q; } catch (e) {}
+renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[quality].ratio));
+async function loadWork(src){
+  const small = EMBED[src], q = QUALITY[quality];
+  let img;
+  if (q.img && small) img = await loadImage(small);
+  else { try { img = await loadImage(src); } catch (e){ if (!small) throw e; img = await loadImage(small); } }
+  // twenty more works in the corridor: cap their size so phones (and modest laptops) keep enough graphics memory
+  const cap = /^(digital|uploads)\//.test(src) ? (isTouch ? 1600 : 0) : 0;
+  const max = [q.img, cap].filter(Boolean);
+  return max.length ? shrink(img, Math.min(...max)) : img;
+}
+function workTexture(img){
+  const t = new THREE.Texture(img); t.needsUpdate = true; t.encoding = THREE.sRGBEncoding; t.anisotropy = MAXANI; return t;
+}
+const paintings = [];   // { a, mat } for every work on the walls, so a quality change can swap the pictures in place
+let qualityRun = 0;
+async function setQuality(q){
+  quality = q; const run = ++qualityRun;
+  try { localStorage.setItem('gallery-quality', q); } catch (e) {}
+  markQuality();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[q].ratio));
+  for (const p of paintings){
+    let img; try { img = await loadWork(p.a.src); } catch (e) { continue; }
+    if (run !== qualityRun) return;   // a newer choice took over
+    const old = p.mat.map; p.mat.map = workTexture(img); p.mat.needsUpdate = true; old.dispose();
+  }
+}
+// opened from the portfolio site: offer the way back
+const backBtn = document.getElementById('backBtn');
+try { if (sessionStorage.getItem('from-portfolio')) backBtn.hidden = false; } catch (e) {}
+backBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  try { sessionStorage.setItem('back-to-top', '1'); } catch (e) {}   // the site opens at its top, not where the visitor left it
+  if (history.length > 1) history.back(); else location.href = 'index.html';
+});
+const qButtons = document.querySelectorAll('.seg [data-q]');
+function markQuality(){ qButtons.forEach(b => b.setAttribute('aria-pressed', b.dataset.q === quality)); }
+qButtons.forEach(b => b.addEventListener('click', e => { e.stopPropagation(); if (b.dataset.q !== quality) setQuality(b.dataset.q); }));
+markQuality();
+
+async function buildArtwork(a, idx){
+  // shown larger than life so the works read from across the room (the label keeps the real size)
+  const long = a.long || (a.size ? Math.max(1.15, Math.max(...a.size)/100*(a.room === 'draw' ? 3 : 2)) : 1.75);
+  let map, w = a.size ? long*Math.min(...a.size)/Math.max(...a.size) : long, h = long;
+  try {
+    const img = await loadWork(a.src), ar = img.width/img.height;
+    if (ar >= 1){ w = long; h = long/ar; } else { h = long; w = long*ar; }
+    map = workTexture(img);
+  } catch (e){
+    console.warn('تصویر پیدا نشد:', a.src);
+    const c = makeCanvas(w/h, 64), g = c.getContext('2d'); g.fillStyle = '#4a4a4a'; g.fillRect(0, 0, c.width, c.height); map = tex(c);
+  }
+
+  const { x, z, rotY, n } = wallFrame(a);
+  const grp = new THREE.Group(); grp.position.set(x, 0, z); grp.rotation.y = rotY; scene.add(grp);
+  const add = (geo, mat, px, py, pz) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); grp.add(m); return m; };
+  const oil = a.room === 'oil';
+  // thin black frame straight around the work, no mount
+  const b = 0.028, d = 0.045, outerW = w + b*2, outerH = h + b*2;
+  const cy = a.y || Math.max(1.62, 1.1 + outerH/2);   // eye level, but clear of the chair rail
+  add(new THREE.BoxGeometry(outerW, b, d), blackFrame, 0, cy + h/2 + b/2, d/2);
+  add(new THREE.BoxGeometry(outerW, b, d), blackFrame, 0, cy - h/2 - b/2, d/2);
+  add(new THREE.BoxGeometry(b, h, d), blackFrame, -w/2 - b/2, cy, d/2);
+  add(new THREE.BoxGeometry(b, h, d), blackFrame,  w/2 + b/2, cy, d/2);
+  // digital works glow from within like a screen, in their true colours, so the corridor needs no spotlight per work
+  const digital = a.room === 'digital';
+  const paintMat = digital ? new THREE.MeshBasicMaterial({ map, toneMapped:false }) : new THREE.MeshStandardMaterial({ map, roughness:oil ? 0.72 : 0.88 });
+  add(new THREE.PlaneGeometry(w, h), paintMat, 0, cy, 0.02);
+  paintings.push({ a, mat:paintMat });
+  // wall label beside the work
+  let pc = null, pm = null;
+  if (!a.noLabel){
+    pc = plaque(a); pm = tex(pc); const pw = 0.34, ph = pw*pc.height/pc.width;
+    add(new THREE.BoxGeometry(pw + 0.016, ph + 0.016, 0.008), giltMat, outerW/2 + 0.32 + pw/2, 1.22, 0.004);
+    add(new THREE.PlaneGeometry(pw, ph), new THREE.MeshStandardMaterial({ map:pm, emissive:0xffffff, emissiveMap:pm, emissiveIntensity:0.42, roughness:0.8 }), outerW/2 + 0.32 + pw/2, 1.22, 0.0085);
+  }
+
+  const center = new THREE.Vector3(x + n.x*0.05, cy, z + n.z*0.05);
+  if (digital){
+    // a soft halo on the wall behind, as a lit screen would cast
+    const glow = document.createElement('canvas'); glow.width = glow.height = 128; const gg = glow.getContext('2d');
+    gg.fillStyle = rad(gg, 64, 64, 20, 64, [[0, 'rgba(200,210,255,.32)'], [1, 'rgba(200,210,255,0)']]); gg.fillRect(0, 0, 128, 128);
+    add(new THREE.PlaneGeometry(outerW*1.7, outerH*1.7), new THREE.MeshBasicMaterial({ map:tex(glow), transparent:true, depthWrite:false }), 0, cy, 0.003);
+    placed.push({ a, center, n, spot:{ intensity:1 }, base:1, pc, pm });
+    return;
+  }
+  const from =new THREE.Vector3(x + n.x*1.6, H - 0.16, z + n.z*1.6);   // up against the ceiling
+  const dist = from.distanceTo(center), span = Math.max(outerW, h + 0.3)/2 + 0.45;
+  const spot = addSpot(from, new THREE.Vector3(x + n.x*0.05 + Math.cos(rotY)*0.25, cy - 0.12, z + n.z*0.05 - Math.sin(rotY)*0.25), Math.atan(span/dist)*1.15, oil ? 1.8 : 1.5);
+  placed.push({ a, center, n, spot, base:spot.intensity, pc, pm });
+}
+
+function buildSigns(){
+  const DSP = '"Markazi Text", serif', BOD = 'Vazirmatn, sans-serif';
+  const L = (key, weight, size, family, color, y) => ({ text:D(key), weight, size, family, color, y });
+  const s1 = textPlane(() => [L('draw', 600, 150, DSP, '#f3efe6', .42), L('sign_draw', 300, 58, BOD, '#c8d1db', .8)], 2.4, 0.6);
+  s1.position.set(-(WT/2 + 0.025), DOOR_H + 0.72, 0); s1.rotation.y = -Math.PI/2; scene.add(s1);
+  const s2 = textPlane(() => [L('oil', 600, 150, DSP, '#f3efe6', .42), L('sign_oil', 300, 58, BOD, '#c8d1db', .8)], 2.4, 0.6);
+  s2.position.set(WT/2 + 0.025, DOOR_H + 0.72, 0); s2.rotation.y = Math.PI/2; scene.add(s2);
+  // over the corridor doorway: its name from the drawing room, and the way back from inside it
+  const s3 = textPlane(() => [L('digital', 600, 150, DSP, '#f3efe6', .42), L('sign_digital', 300, 58, BOD, '#c8d1db', .8)], 2.4, 0.6);
+  s3.position.set(DRAW_X[1] - 0.025, DOOR_H + 0.72, 0); s3.rotation.y = -Math.PI/2; scene.add(s3);
+  const s4 = textPlane(() => [L('draw', 600, 150, DSP, '#f3efe6', .42), L('sign_draw', 300, 58, BOD, '#c8d1db', .8)], 2.4, 0.6);
+  s4.position.set(DIG_X[0] + 0.025, DOOR_H + 0.72, 0); s4.rotation.y = Math.PI/2; scene.add(s4);
+  // entrance wall: who the artist is, then what the show holds
+  const t = textPlane(() => [
+    L('portfolio', 700, 250, DSP, '#f8f5ef', .25),
+    L('artist', 600, 110, DSP, '#e8d6a6', .55),
+    L('bio', 500, 62, BOD, '#e6eaf0', .72),
+    L('wall_works', 400, 54, BOD, '#cfd6df', .88),
+  ], 3.6, 2.0, 1);
+  t.position.set(OIL_X[0] + 0.02, 2.2, 0); t.rotation.y = Math.PI/2; scene.add(t);
+  box(0.004, 0.006, 1.1, OIL_X[0] + 0.02, 2.4, 0, giltMat, false);   // gold rule under the heading
+  addSpot(new THREE.Vector3(OIL_X[0] + 1.6, H - 0.16, 0), new THREE.Vector3(OIL_X[0], 2.2, 0), 0.75, 0.55);   // soft wash so the lettering stays readable
+}
+
+/* ---------------- audio ---------------- */
+let actx = null, master, musicBus, musicWet, sfxBus, noiseBuf, musicOn = true;
+function initAudio(){
+  if (actx) { actx.resume(); return; }
+  // a page updated in place keeps the old version's audio running; shut it down first
+  try { if (window.__galleryAudio){ window.__galleryAudio.timers.forEach(clearInterval); window.__galleryAudio.ctx.close(); } } catch (e) {}
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  master = actx.createGain(); master.gain.value = 0.9; master.connect(actx.destination);
+  window.__galleryAudio = { ctx:actx, master, timers:[] };
+  const verb = actx.createConvolver(), len = actx.sampleRate*3.2, ir = actx.createBuffer(2, len, actx.sampleRate);
+  for (let ch = 0; ch < 2; ch++){ const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random()*2 - 1)*Math.pow(1 - i/len, 2.6); }
+  verb.buffer = ir; const wet = actx.createGain(); wet.gain.value = 0.55; verb.connect(wet); wet.connect(master);
+  sfxBus = actx.createGain(); sfxBus.gain.value = 0.8; sfxBus.connect(master); const sfxSend = actx.createGain(); sfxSend.gain.value = 0.35; sfxBus.connect(sfxSend); sfxSend.connect(verb);
+  musicBus = actx.createGain(); musicBus.gain.value = 0; musicBus.connect(master); musicWet = actx.createGain(); musicWet.gain.value = 0; musicBus.connect(musicWet); musicWet.connect(verb);
+  noiseBuf = actx.createBuffer(1, actx.sampleRate*1, actx.sampleRate); const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random()*2 - 1;
+  startMusic(); setMusic(musicOn);
+}
+// a step on carpet: heel then toe as two soft, muffled thuds, a faint scuff of the sole on the pile,
+// alternating feet slightly left and right, and no two steps quite the same
+let footSide = 1;
+function footstep(run){
+  if (!actx) return;
+  const t0 = actx.currentTime + Math.random()*0.012, v = (run ? 1.3 : 1)*(0.85 + Math.random()*0.3);
+  footSide = -footSide;
+  const out = actx.createGain(); out.gain.value = footSide > 0 ? 0.8 : 0.7;
+  if (actx.createStereoPanner){ const pan = actx.createStereoPanner(); pan.pan.value = footSide*0.12; out.connect(pan); pan.connect(sfxBus); }
+  else out.connect(sfxBus);
+  const noise = (t, len, filter, amp, attack) => {
+    const s = actx.createBufferSource(); s.buffer = noiseBuf; s.playbackRate.value = 0.6 + Math.random()*0.3;
+    const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(amp, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    s.connect(filter); filter.connect(g); g.connect(out); s.start(t, Math.random()*0.6); s.stop(t + len + 0.05);
+  };
+  const lowpass = f => { const b = actx.createBiquadFilter(); b.type = 'lowpass'; b.frequency.value = f; b.Q.value = 0.7; return b; };
+  const roll = run ? 0.045 : 0.11 + Math.random()*0.03;                          // a slow heel-to-toe roll
+  noise(t0, 0.18, lowpass(230 + Math.random()*70), 0.5*v, 0.02);                 // heel, set down gently
+  noise(t0 + roll, 0.14, lowpass(330 + Math.random()*90), 0.24*v, 0.02);         // toe
+  const body = actx.createOscillator(), bg = actx.createGain();                    // a little weight under the heel
+  body.frequency.setValueAtTime(85 + Math.random()*15, t0); body.frequency.exponentialRampToValueAtTime(50, t0 + 0.09);
+  bg.gain.setValueAtTime(0.0001, t0); bg.gain.exponentialRampToValueAtTime(0.18*v, t0 + 0.01); bg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+  body.connect(bg); bg.connect(out); body.start(t0); body.stop(t0 + 0.13);
+  const scuff = actx.createBiquadFilter(); scuff.type = 'bandpass'; scuff.frequency.value = 1400 + Math.random()*900; scuff.Q.value = 0.8;
+  noise(t0 + roll*0.3, roll + 0.12, scuff, 0.03*v, roll*0.5);                     // sole brushing the pile
+}
+// برای پخش یک ضبط واقعی (مثلاً اجرای سونگ‌جین چو)، فایل صوتی را کنار صفحه بگذار و نامش را اینجا بنویس، مثلاً 'music.mp3'
+const MUSIC_FILE = null;
+function startMusic(){
+  if (MUSIC_FILE){ const el = new Audio(MUSIC_FILE); el.loop = true; actx.createMediaElementSource(el).connect(musicBus); el.play().catch(() => {}); return; }
+  // Chopin, Piano Sonata No. 2 in B-flat minor, 3rd movement "Marche funèbre" (public domain):
+  // the opening of the march on a synthesized piano, the rocking B-flat / G-flat bass under the dotted theme.
+  const STEP = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const hz = s => { const m = /^([A-G])(#|b)?(\d)$/.exec(s); return 440*Math.pow(2, (12*(+m[3] + 1) + STEP[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) - 69)/12); };
+  const out = actx.createGain(); out.gain.value = 0.55; out.connect(musicBus);
+  // piano: a few slightly stretched partials, a hammer knock, a natural decay and a damper on release
+  const piano = (f, t, d, v) => {
+    const g = actx.createGain(), lp = actx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(Math.min(9000, f*10), t); lp.frequency.exponentialRampToValueAtTime(Math.min(3500, f*3.5), t + 0.8);
+    const ring = 1.2 + 4*Math.max(0, (500 - f)/500);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.005);
+    g.gain.setTargetAtTime(v*0.2, t + 0.005, ring*0.35); g.gain.setTargetAtTime(0, t + d, 0.18);
+    lp.connect(g); g.connect(out);
+    [[1, 1], [2, 0.45], [3, 0.2], [4, 0.09], [5, 0.04]].forEach(([n, a]) => {
+      const o = actx.createOscillator(), og = actx.createGain(); o.frequency.value = f*n*(1 + 0.0004*n*n); og.gain.value = a;
+      o.connect(og); og.connect(lp); o.start(t); o.stop(t + d + 1.2);
+    });
+    const k = actx.createBufferSource(), bp = actx.createBiquadFilter(), kg = actx.createGain(); k.buffer = noiseBuf; bp.type = 'bandpass'; bp.frequency.value = Math.min(5000, f*4);
+    kg.gain.setValueAtTime(v*0.15, t); kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.04); k.connect(bp); bp.connect(kg); kg.connect(out); k.start(t); k.stop(t + 0.06);
+  };
+  // score in quarter notes: { t, d, notes, v }
+  const BEAT = 1.25, score = [];
+  const add = (t, d, notes, v) => score.push({ t, d, notes:notes.split(' '), v });
+  const down = n => n.replace(/\d$/, o => o - 1);
+  const THEME = [['Bb4', 1], ['Bb4', 0.75], ['Bb4', 0.25], ['Bb4', 2], ['Db5', 0.75], ['C5', 0.25], ['C5', 0.75], ['Bb4', 0.25], ['Bb4', 0.75], ['A4', 0.25], ['Bb4', 1]];
+  const RISE  = [['Db5', 1], ['Db5', 0.75], ['Db5', 0.25], ['Db5', 2], ['F5', 0.75], ['Eb5', 0.25], ['Eb5', 0.75], ['Db5', 0.25], ['Db5', 0.75], ['C5', 0.25], ['Db5', 1]];
+  for (let b = 0; b < 40; b++) add(b, 1.1, b % 2 ? 'Gb1 Db2 Gb2' : 'Bb1 F2 Bb2', 0.17 + (b % 2 ? 0 : 0.03));   // the tolling bass
+  let at = 8;
+  [[THEME, 0.3], [THEME, 0.32], [RISE, 0.38], [THEME, 0.3]].forEach(([phrase, v]) => {
+    for (const [n, d] of phrase){ add(at, d*0.95, `${n} ${down(n)}`, d >= 1 ? v : v*0.85); at += d; }
+  });
+  add(40, 4, 'Bb0 Bb1 F2 Db3 F3 Bb3 Db4', 0.3);                                                      // closing B-flat minor
+  score.sort((x, y) => x.t - y.t);
+  const LOOP = 48;
+  const play = (e, T) => {
+    if (!musicOn) return;                       // muted: keep time, schedule nothing
+    const t = T + e.t*BEAT, v = e.v/Math.sqrt(e.notes.length);
+    for (const n of e.notes) piano(hz(n), t, e.d*BEAT, v);
+  };
+  let i = 0, T = actx.currentTime + 0.4;
+  const tick = () => {
+    while (T + score[i].t*BEAT < actx.currentTime + 2){ play(score[i], T); if (++i >= score.length){ i = 0; T += LOOP*BEAT; } }
+  };
+  tick(); window.__galleryAudio.timers.push(setInterval(tick, 300));
+}
+const musicBtn = document.getElementById('musicBtn');
+function setMusic(on){
+  musicOn = on; musicBtn.setAttribute('aria-pressed', on); musicBtn.textContent = D(on ? 'music_on' : 'music_off');
+  if (musicBus){
+    const t = actx.currentTime;
+    for (const [node, val] of [[musicBus.gain, 0.75], [musicWet.gain, 0.9]]){
+      node.cancelScheduledValues(t); node.setValueAtTime(node.value, t); node.linearRampToValueAtTime(on ? val : 0, t + (on ? 1.2 : 0.25));
+    }
+  }
+}
+musicBtn.addEventListener('click', e => { e.stopPropagation(); initAudio(); setMusic(!musicOn); musicBtn.blur(); });
+
+/* ---------------- input ---------------- */
+const keys = new Set();
+const MOVE_CODES = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'];
+addEventListener('keydown', e => { if (MOVE_CODES.includes(e.code)) e.preventDefault(); keys.add(e.code); if (e.code === 'KeyM' && !e.repeat){ initAudio(); setMusic(!musicOn); } });
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+
+const intro = document.getElementById('intro'), enterBtn = document.getElementById('enter');
+let playing = false, locked = false, dragLook = false, dragging = false, enterState = 'loading';
+const canvas = renderer.domElement;
+function setPlaying(p){
+  playing = p; document.body.classList.toggle('playing', p); intro.classList.toggle('gone', p);
+  if (!p){ keys.clear(); enterState = 'resume'; enterBtn.textContent = D(enterState); }
+}
+function requestLock(){
+  if (isTouch) { setPlaying(true); return; }
+  dragLook = false;                      // always try the real mouse lock again; fall back only if the browser refuses this time
+  const fallback = () => { dragLook = true; setPlaying(true); };
+  try {
+    // raw, unaccelerated mouse like a shooter; browsers without that option get a plain lock
+    const r = canvas.requestPointerLock({ unadjustedMovement:true });
+    if (r && r.catch) r.catch(() => {
+      try { const r2 = canvas.requestPointerLock(); if (r2 && r2.catch) r2.catch(fallback); } catch (e) { fallback(); }
+    });
+  } catch (e) { fallback(); }
+}
+enterBtn.addEventListener('click', () => { initAudio(); requestLock(); if (isTouch) setPlaying(true); });
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === canvas;
+  if (locked) setPlaying(true); else if (!dragLook) setPlaying(false);
+});
+document.addEventListener('pointerlockerror', () => { dragLook = true; setPlaying(true); });
+canvas.addEventListener('click', () => { if (!isTouch && !locked) requestLock(); });
+// Esc can be swallowed by the browser or the page hosting the gallery, so P and an on-screen button pause too
+function pause(){ if (!playing) return; if (document.pointerLockElement) document.exitPointerLock(); else setPlaying(false); }
+document.getElementById('pauseBtn').addEventListener('click', e => { e.stopPropagation(); pause(); e.currentTarget.blur(); });
+addEventListener('keydown', e => { if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) pause(); });
+// mouse turns the view directly, one-to-one, like a shooter
+let turnVel = 0;
+const look = (dx, dy, k) => {
+  if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;   // drop the occasional bogus jump some browsers report
+  player.yaw -= dx*k; player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - dy*k));
+};
+// without a mouse lock the cursor stops at the screen edge, so holding it near the left/right edge keeps turning
+const pointer = { x:0.5, inside:false };
+document.addEventListener('mousemove', e => { pointer.x = e.clientX/innerWidth; pointer.inside = true; });
+document.documentElement.addEventListener('mouseleave', () => { pointer.inside = false; });
+addEventListener('blur', () => { pointer.inside = false; });
+document.addEventListener('mousemove', e => { if (!playing || isTouch) return; if (locked || dragLook) look(e.movementX, e.movementY, 0.0022); });   // no button needed in either mode
+canvas.addEventListener('mousedown', () => { dragging = true; });
+addEventListener('mouseup', () => { dragging = false; });
+
+// touch: joystick on the left, drag anywhere else to look
+const joy = document.getElementById('joy'), knob = joy.querySelector('.knob'), runBtn = document.getElementById('runBtn');
+const touchMove = { x:0, y:0 }; let joyId = null, lookId = null, lookLast = null, touchRun = false;
+joy.addEventListener('touchstart', e => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive:false });
+function moveJoy(t){ const r = joy.getBoundingClientRect(); let dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2); const m = Math.hypot(dx, dy), max = r.width/2 - 10; if (m > max){ dx *= max/m; dy *= max/m; } knob.style.transform = `translate(${dx}px,${dy}px)`;
+  // full walking speed from about half a push, with a small dead zone so a resting thumb doesn't drift
+  const k = m < 1 ? 0 : Math.min(1, Math.max(0, (Math.min(m, max)/max - 0.1)/0.45))/Math.min(m, max);
+  touchMove.x = dx*k; touchMove.y = -dy*k; }
+addEventListener('touchmove', e => {
+  for (const t of e.changedTouches){
+    if (t.identifier === joyId) moveJoy(t);
+    else if (t.identifier === lookId){ look(t.clientX - lookLast.x, t.clientY - lookLast.y, 0.0045); lookLast = { x:t.clientX, y:t.clientY }; }
+  }
+  if (playing) e.preventDefault();
+}, { passive:false });
+canvas.addEventListener('touchstart', e => { if (lookId === null){ const t = e.changedTouches[0]; lookId = t.identifier; lookLast = { x:t.clientX, y:t.clientY }; } }, { passive:true });
+addEventListener('touchend', e => { for (const t of e.changedTouches){ if (t.identifier === joyId){ joyId = null; touchMove.x = touchMove.y = 0; knob.style.transform = ''; } if (t.identifier === lookId) lookId = null; } });
+addEventListener('touchcancel', () => { joyId = lookId = null; touchMove.x = touchMove.y = 0; knob.style.transform = ''; });
+runBtn.addEventListener('click', () => { touchRun = !touchRun; runBtn.setAttribute('aria-pressed', touchRun); runBtn.textContent = D(touchRun ? 'run_on' : 'run'); });
+
+/* ---------------- language ---------------- */
+const langBtn = document.getElementById('langBtn');
+function applyLang(){
+  const root = document.documentElement; root.lang = lang; root.dir = lang === 'fa' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = D(el.dataset.i18n); });
+  enterBtn.textContent = D(enterState);
+  musicBtn.textContent = D(musicOn ? 'music_on' : 'music_off');
+  runBtn.textContent = D(touchRun ? 'run_on' : 'run');
+  langBtn.textContent = D('langBtn'); langBtn.lang = lang === 'fa' ? 'en' : 'fa';
+  setRoomLabel();
+  for (const p of placed) if (p.pc){ drawPlaque(p.pc, p.a); p.pm.needsUpdate = true; }
+  signs.forEach(redraw => redraw());
+  if (shown) showInfo(shown.a);
+}
+function toggleLang(){
+  lang = lang === 'fa' ? 'en' : 'fa';
+  try { sessionStorage.setItem('gallery-lang', lang); } catch (e) {}
+  applyLang();
+}
+langBtn.addEventListener('click', e => { e.stopPropagation(); toggleLang(); langBtn.blur(); });
+addEventListener('keydown', e => { if (e.code === 'KeyL' && !e.repeat) toggleLang(); });
+
+/* ---------------- movement & collision ---------------- */
+function blocked(x, z){
+  for (const c of colliders) if (x > c.minX - RADIUS && x < c.maxX + RADIUS && z > c.minZ - RADIUS && z < c.maxZ + RADIUS) return true;
+  return false;
+}
+const infoEl = document.getElementById('info'), roomEl = document.getElementById('room');
+const iTitle = infoEl.querySelector('.i-title'), iMeta = infoEl.querySelector('.i-meta'), iDesc = infoEl.querySelector('.i-desc');
+let shown = null, curRoom = 'oil';
+const fwdV = new THREE.Vector3(), toArt = new THREE.Vector3();
+
+function update(dt){
+  let fx = 0, sx = 0, run = false;
+  if (playing){
+    if (keys.has('KeyW') || keys.has('ArrowUp')) fx += 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) fx -= 1;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) sx += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) sx -= 1;
+    fx += touchMove.y; sx += touchMove.x;
+    run = keys.has('ShiftLeft') || keys.has('ShiftRight') || touchRun;
+  }
+  let turnTarget = 0;
+  if (playing){
+    const EDGE = 0.16, ease = u => u*u*(3 - 2*u);
+    if (dragLook && !locked && pointer.inside && !isTouch){
+      if (pointer.x < EDGE) turnTarget += 2.2*ease((EDGE - pointer.x)/EDGE);
+      else if (pointer.x > 1 - EDGE) turnTarget -= 2.2*ease((pointer.x - (1 - EDGE))/EDGE);
+    }
+    if (keys.has('KeyQ')) turnTarget += 1.9;
+    if (keys.has('KeyE')) turnTarget -= 1.9;
+  }
+  // edge and key turning speed up and slow down gently instead of switching on and off
+  turnVel += (turnTarget - turnVel)*Math.min(1, dt*5);
+  player.yaw += turnVel*dt;
+  const m = Math.hypot(fx, sx); if (m > 1){ fx /= m; sx /= m; }
+  const speed = run ? 4.4 : 2.2, sy = Math.sin(player.yaw), cyw = Math.cos(player.yaw);
+  const tvx = (-sy*fx + cyw*sx)*speed, tvz = (-cyw*fx - sy*sx)*speed, k = Math.min(1, dt*6);
+  player.vx += (tvx - player.vx)*k; player.vz += (tvz - player.vz)*k;
+  const nx = player.x + player.vx*dt; if (!blocked(nx, player.z)) player.x = nx; else player.vx = 0;
+  const nz = player.z + player.vz*dt; if (!blocked(player.x, nz)) player.z = nz; else player.vz = 0;
+
+  const v = Math.hypot(player.vx, player.vz), prev = Math.floor(player.step);
+  player.step += dt*v/(run ? 1.15 : 1.05);   // long, easy strides, about 2.1 steps a second
+  if (Math.floor(player.step) !== prev && v > 0.4) footstep(run);
+  const bobAmt = Math.min(1, v/2.2);
+  camera.position.set(player.x, EYE - Math.abs(Math.sin(player.step*Math.PI))*0.045*bobAmt + 0.02*bobAmt, player.z);
+  camera.rotation.set(player.pitch, player.yaw, Math.sin(player.step*Math.PI)*0.004*bobAmt);
+
+  // which work are we looking at?
+  camera.getWorldDirection(fwdV);
+  let best = null, bestD = 3.6;
+  for (const p of placed){
+    toArt.subVectors(p.center, camera.position); const d = Math.hypot(toArt.x, toArt.z);
+    const inFront = (camera.position.x - p.center.x)*p.n.x + (camera.position.z - p.center.z)*p.n.z > 0.3;
+    if (inFront && d < bestD && toArt.normalize().dot(fwdV) > 0.72){ best = p; bestD = d; }
+  }
+  for (const p of placed) p.spot.intensity += ((p === best ? p.base*1.15 : p.base) - p.spot.intensity)*Math.min(1, dt*4);
+  if (best !== shown){
+    shown = best; infoEl.classList.toggle('show', !!best); document.body.classList.toggle('near', !!best);
+    if (best) showInfo(best.a);
+  }
+  const room = player.x < 0 ? 'oil' : player.x < DRAW_X[1] + WT/2 ? 'draw' : 'digital';
+  if (room !== curRoom){ curRoom = room; setRoomLabel(); }
+}
+function showInfo(a){
+  const title = titleOf(a);
+  iTitle.textContent = title || sizeLabel(a);
+  iMeta.textContent = title ? sizeLabel(a) : ''; iMeta.hidden = !title;
+  iDesc.hidden = true;
+}
+function setRoomLabel(){ roomEl.querySelector('.r-name').textContent = D(curRoom); roomEl.querySelector('.r-count').textContent = D(curRoom + '_count'); }
+
+let last = performance.now();
+// slow phones keep real walking speed down to 10 frames a second
+function frame(t){ const dt = Math.min(0.1, (t - last)/1000); last = t; update(dt); renderer.render(scene, camera); requestAnimationFrame(frame); }
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+/* ---------------- boot ---------------- */
+(async () => {
+  applyLang();                          // set the page language before the fonts finish loading
+  try {
+    await Promise.race([
+      Promise.all(['700 90px "Markazi Text"', '600 90px "Markazi Text"', '400 40px Vazirmatn', '500 40px Vazirmatn', '300 40px Vazirmatn'].flatMap(f => [document.fonts.load(f, 'رنگ و خط'), document.fonts.load(f, 'Ab')])),
+      new Promise(r => setTimeout(r, 3500))
+    ]);
+  } catch (e) {}
+  applyLang();
+  buildSigns();
+  update(0); renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+  for (let i = 0; i < ARTWORKS.length; i++){ await buildArtwork(ARTWORKS[i], i); await new Promise(r => setTimeout(r, 0)); }
+  enterBtn.disabled = false; enterState = 'enter'; enterBtn.textContent = D(enterState);
+})();
+})();
+</script>
