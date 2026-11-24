@@ -13,8 +13,9 @@ backend:
 local_backend: true
 locale: fa
 
+# paths are from the repository root, where everything sits inside github-upload/
 # new images go here, and are published at /uploads/...
-media_folder: site/uploads
+media_folder: github-upload/site/uploads
 public_folder: /uploads
 
 collections:
@@ -25,7 +26,7 @@ collections:
     files:
       - name: works
         label: آثار
-        file: site/content/works.json
+        file: github-upload/site/content/works.json
         format: json
         fields:
           - name: works
